@@ -134,7 +134,7 @@
           name: item.name,
           category: item.category,
           qty: 1,
-          unitPrice: item.price || 0,
+          price: Number(item.price) || 0,
         });
       }
       searchInput.value = '';
@@ -156,7 +156,7 @@
 
       let total = 0;
       cartBody.innerHTML = cart.map((item, idx) => {
-        const lineTotal = item.qty * (Number(item.unitPrice) || 0);
+        const lineTotal = item.qty * (Number(item.price) || 0);
         total += lineTotal;
         return `
           <tr>
@@ -165,13 +165,13 @@
               <div class="qty-controls">
                 <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, -1)">−</button>
                 <input type="number" value="${item.qty}" min="1"
-                       onchange="setQty(${idx}, this.value)" class="qty-input">
+                       oninput="setQty(${idx}, this.value)" class="qty-input">
                 <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, 1)">+</button>
               </div>
             </td>
             <td class="num">
-              <input type="number" class="price-input" value="${item.unitPrice}" min="0" step="1"
-                     onchange="setPrice(${idx}, this.value)">
+              <input type="number" class="price-input" value="${item.price}" min="0" step="1"
+                     oninput="setPrice(${idx}, this.value)">
             </td>
             <td class="num">${formatPKR(lineTotal)}</td>
             <td>
@@ -195,7 +195,7 @@
     };
 
     window.setPrice = function(idx, val) {
-      cart[idx].unitPrice = Math.max(0, parseFloat(val) || 0);
+      cart[idx].price = Math.max(0, parseFloat(val) || 0);
       renderCart();
     };
 
@@ -271,18 +271,9 @@
       btnSave.disabled = true;
       btnSave.textContent = 'Saving…';
 
-      const saleData = {
-        action: 'sale',
-        patientName: patientName,
-        items: cart.map(item => ({
-          name: item.name,
-          category: item.category,
-          qty: item.qty,
-          price: Number(item.unitPrice) || 0,
-        })),
-      };
-
-      console.log(JSON.stringify(saleData));
+      syncCartFromDOM(cartBody, cart);
+      const saleData = buildSaleData(cart, patientName);
+      console.log('SENDING:', JSON.stringify(saleData));
 
       try {
         const result = await apiPost(saleData);

@@ -46,6 +46,7 @@
   <script src="app.js"></script>
   <script>
     let allHistory = [];
+    let allInvoices = [];
     let expandedInvoice = null;
 
     const historyContainer = document.getElementById('history-container');
@@ -64,6 +65,7 @@
         const data = await apiGet('history');
         console.log('History API response:', JSON.stringify(data));
         allHistory = data.days || [];
+        allInvoices = data.invoices || allHistory.flatMap(day => day.invoices || []);
         renderHistory();
       } catch (err) {
         historyContainer.innerHTML = `<div class="card empty-state">Failed to load: ${escapeHtml(err.message)}</div>`;
@@ -101,7 +103,7 @@
                         <td>${escapeHtml(item.category)}</td>
                         <td class="num">${item.qty}</td>
                         <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice)}</td>
-                        <td class="num">${formatPKR(item.lineTotal)}</td>
+                        <td class="num">${formatPKR((item.qty || 0) * (item.price != null ? item.price : item.unitPrice || 0))}</td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -121,17 +123,29 @@
 
     function renderHistory() {
       const { from, to } = getDateFilter();
-      let days = allHistory
-        .map(day => ({
-          ...day,
-          invoices: day.invoices.filter(inv => dateInRange(inv.date, from, to)),
-        }))
-        .filter(day => day.invoices.length > 0);
+      const filtered = allInvoices.filter(inv => dateInRange(inv.date, from, to));
 
-      if (!days.length) {
+      if (!filtered.length) {
         historyContainer.innerHTML = '<div class="card empty-state">No invoices found for this period.</div>';
         return;
       }
+
+      const dayMap = {};
+      filtered.forEach(inv => {
+        const key = formatDate(inv.date);
+        if (!dayMap[key]) {
+          dayMap[key] = { date: inv.date, invoices: [], totalRevenue: 0 };
+        }
+        dayMap[key].invoices.push(inv);
+        dayMap[key].totalRevenue += inv.total || 0;
+      });
+
+      const days = Object.keys(dayMap).sort((a, b) => {
+        const da = parseSheetDate(dayMap[a].date);
+        const db = parseSheetDate(dayMap[b].date);
+        if (!da || !db) return b.localeCompare(a);
+        return db - da;
+      }).map(key => dayMap[key]);
 
       historyContainer.innerHTML = days.map(day => `
         <div class="date-separator">${formatDate(day.date)}</div>

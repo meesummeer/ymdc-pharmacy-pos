@@ -47,6 +47,32 @@ async function apiPost(body) {
   return data;
 }
 
+// ── Sale payload builder ─────────────────────────────────────────
+function buildSaleData(cart, patientName) {
+  return {
+    action: 'sale',
+    patientName: String(patientName || '').trim(),
+    items: cart.map(item => ({
+      name: String(item.name || ''),
+      category: String(item.category || ''),
+      qty: Number(item.qty) || 1,
+      price: Number(item.price) || 0,
+    })),
+  };
+}
+
+function syncCartFromDOM(cartBody, cart) {
+  if (!cartBody) return cart;
+  cartBody.querySelectorAll('tr').forEach((row, idx) => {
+    if (!cart[idx]) return;
+    const qtyInput = row.querySelector('.qty-input');
+    const priceInput = row.querySelector('.price-input');
+    if (qtyInput) cart[idx].qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+    if (priceInput) cart[idx].price = Math.max(0, parseFloat(priceInput.value) || 0);
+  });
+  return cart;
+}
+
 // ── Formatting ───────────────────────────────────────────────────
 function formatPKR(amount) {
   const n = Number(amount) || 0;
@@ -105,8 +131,9 @@ function getCurrentMonthRange() {
 }
 
 function dateInRange(dateStr, fromDMY, toDMY) {
+  if (!fromDMY && !toDMY) return true;
   const d = parseSheetDate(dateStr);
-  if (!d) return true;
+  if (!d) return false;
   const from = parseFilterDate(fromDMY);
   const to = parseFilterDate(toDMY);
   if (from && d < from) return false;

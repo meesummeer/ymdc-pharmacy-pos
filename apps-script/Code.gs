@@ -30,7 +30,7 @@ function doGet(e) {
       case 'inventory':
         return jsonResponse({ items: getInventory() });
       case 'history':
-        return jsonResponse({ days: getHistory() });
+        return jsonResponse({ days: getHistory(), invoices: getAllInvoices() });
       default:
         return jsonResponse({ error: 'Unknown action. Use ?action=inventory or ?action=history' });
     }
@@ -66,8 +66,7 @@ function runSetup() {
 
 function migrateSalesSheet() {
   const sheet = getSheet(SHEETS.SALES);
-  const lastCol = sheet.getLastColumn();
-  if (lastCol > SALES_HEADERS.length) {
+  while (sheet.getLastColumn() > SALES_HEADERS.length) {
     sheet.deleteColumn(SALES_HEADERS.length + 1);
   }
   sheet.getRange(1, 1, 1, SALES_HEADERS.length).setValues([SALES_HEADERS]);
@@ -199,6 +198,10 @@ function formatSheetTime(date) {
 function normalizeCellDate(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
     return formatSheetDate(value);
+  }
+  if (typeof value === 'number' && value > 0) {
+    const d = new Date(Math.round((value - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) return formatSheetDate(d);
   }
   return String(value || '').trim();
 }
@@ -404,17 +407,15 @@ function saveSale(body) {
   const sheet = getSheet(SHEETS.SALES);
 
   body.items.forEach(function(item) {
-    const name = String(item.name || item.itemName || '');
+    const name = String(item.name || '');
     const category = String(item.category || '');
     const qty = Number(item.qty) || 0;
-    const price = Number(item.price != null ? item.price : item.unitPrice) || 0;
+    const price = Number(item.price) || 0;
     sheet.appendRow([invoiceNo, date, time, patientName, name, category, qty, price]);
   });
 
   const total = body.items.reduce(function(sum, item) {
-    const qty = Number(item.qty) || 0;
-    const price = Number(item.price != null ? item.price : item.unitPrice) || 0;
-    return sum + lineTotal(qty, price);
+    return sum + lineTotal(Number(item.qty) || 0, Number(item.price) || 0);
   }, 0);
 
   updateDailySummary();
@@ -531,4 +532,15 @@ function getHistory() {
   });
 
   return days;
+}
+
+function getAllInvoices() {
+  const days = getHistory();
+  const invoices = [];
+  days.forEach(function(day) {
+    day.invoices.forEach(function(inv) {
+      invoices.push(inv);
+    });
+  });
+  return invoices;
 }
