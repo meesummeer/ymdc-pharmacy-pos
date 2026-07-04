@@ -53,10 +53,58 @@ function formatPKR(amount) {
   return 'PKR ' + n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function parseSheetDate(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  if (s.includes('/')) {
+    const [d, m, y] = s.split('/');
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+  }
+  if (s.includes('-')) {
+    const parts = s.split('-');
+    if (parts[0].length === 4) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-PK', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  const d = parseSheetDate(dateStr);
+  if (!d) return dateStr || '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function toInputDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getCurrentMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { from: toInputDate(first), to: toInputDate(last) };
+}
+
+function dateInRange(dateStr, fromIso, toIso) {
+  const d = parseSheetDate(dateStr);
+  if (!d) return true;
+  if (fromIso) {
+    const from = new Date(fromIso + 'T00:00:00');
+    if (d < from) return false;
+  }
+  if (toIso) {
+    const to = new Date(toIso + 'T23:59:59');
+    if (d > to) return false;
+  }
+  return true;
 }
 
 function formatTime(timeStr) {

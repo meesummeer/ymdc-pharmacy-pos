@@ -11,18 +11,14 @@ const SHEETS = {
   CONFIG: 'Config',
 };
 
-// ── CORS + JSON helpers ──────────────────────────────────────────
+const SALES_HEADERS = ['Invoice No', 'Date', 'Time', 'Patient Name', 'Item Name', 'Category', 'Qty', 'Unit Price'];
+
+// ── JSON helpers ─────────────────────────────────────────────────
 
 function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
-}
-
-function corsHeaders() {
-  // Apps Script Web Apps handle CORS via deployment settings;
-  // returning JSON with proper mime type is sufficient for fetch().
-  return {};
 }
 
 // ── Entry points ─────────────────────────────────────────────────
@@ -61,6 +57,61 @@ function doPost(e) {
   }
 }
 
+// ── One-time setup ───────────────────────────────────────────────
+
+function runSetup() {
+  migrateSalesSheet();
+  formatSheetHeaders();
+}
+
+function migrateSalesSheet() {
+  const sheet = getSheet(SHEETS.SALES);
+  const lastCol = sheet.getLastColumn();
+  if (lastCol > SALES_HEADERS.length) {
+    sheet.deleteColumn(SALES_HEADERS.length + 1);
+  }
+  sheet.getRange(1, 1, 1, SALES_HEADERS.length).setValues([SALES_HEADERS]);
+}
+
+function formatSheetHeaders() {
+  const ss = getSpreadsheet();
+  const navy = '#003366';
+  const gold = '#C9A84C';
+  const grey = '#e2e6ea';
+
+  const sales = ss.getSheetByName(SHEETS.SALES);
+  if (sales && sales.getLastColumn() > 0) {
+    const hdr = sales.getRange(1, 1, 1, sales.getLastColumn());
+    hdr.setBackground(navy).setFontColor('#ffffff').setFontWeight('bold');
+    sales.setFrozenRows(1);
+    sales.autoResizeColumns(1, sales.getLastColumn());
+  }
+
+  const inventory = ss.getSheetByName(SHEETS.INVENTORY);
+  if (inventory && inventory.getLastColumn() > 0) {
+    const hdr = inventory.getRange(1, 1, 1, inventory.getLastColumn());
+    hdr.setBackground(navy).setFontColor('#ffffff').setFontWeight('bold');
+    inventory.setFrozenRows(1);
+    inventory.autoResizeColumns(1, inventory.getLastColumn());
+  }
+
+  const summary = ss.getSheetByName(SHEETS.DAILY_SUMMARY);
+  if (summary && summary.getLastColumn() > 0) {
+    const hdr = summary.getRange(1, 1, 1, summary.getLastColumn());
+    hdr.setBackground(gold).setFontColor(navy).setFontWeight('bold');
+    summary.setFrozenRows(1);
+    summary.autoResizeColumns(1, summary.getLastColumn());
+  }
+
+  const config = ss.getSheetByName(SHEETS.CONFIG);
+  if (config && config.getLastColumn() > 0) {
+    const hdr = config.getRange(1, 1, 1, config.getLastColumn());
+    hdr.setBackground(grey).setFontWeight('bold');
+    config.setFrozenRows(1);
+    config.autoResizeColumns(1, config.getLastColumn());
+  }
+}
+
 // ── Spreadsheet access ───────────────────────────────────────────
 
 function getSpreadsheet() {
@@ -87,7 +138,7 @@ function getSheet(name) {
 
 function initializeSheets(ss) {
   setupSheet(ss, SHEETS.INVENTORY, ['ID', 'Item Name', 'Category', 'Price (PKR)', 'Active (TRUE/FALSE)']);
-  setupSheet(ss, SHEETS.SALES, ['Invoice No', 'Date', 'Time', 'Patient Name', 'Item Name', 'Category', 'Qty', 'Unit Price', 'Line Total']);
+  setupSheet(ss, SHEETS.SALES, SALES_HEADERS);
   setupSheet(ss, SHEETS.DAILY_SUMMARY, ['Date', 'Total Invoices', 'Total Revenue (PKR)']);
   setupSheet(ss, SHEETS.CONFIG, ['Key', 'Value']);
 
@@ -113,6 +164,37 @@ function setupSheet(ss, name, headers) {
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
   }
+}
+
+// ── Date helpers ─────────────────────────────────────────────────
+
+function parseDateStr(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  if (s.indexOf('/') !== -1) {
+    const parts = s.split('/');
+    return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+  }
+  if (s.indexOf('-') !== -1) {
+    const parts = s.split('-');
+    if (parts[0].length === 4) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatSheetDate(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+}
+
+function formatSheetTime(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'hh:mm a');
+}
+
+function lineTotal(qty, unitPrice) {
+  return (Number(qty) || 0) * (Number(unitPrice) || 0);
 }
 
 // ── Preloaded inventory ──────────────────────────────────────────
@@ -224,11 +306,6 @@ function getInventory() {
   return items;
 }
 
-function getAllInventoryRows() {
-  const sheet = getSheet(SHEETS.INVENTORY);
-  return sheet.getDataRange().getValues();
-}
-
 function handleInventory(body) {
   const op = body.operation;
 
@@ -301,27 +378,29 @@ function saveSale(body) {
 
   const invoiceNo = getNextInvoiceNo();
   const now = new Date();
-  const date = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  const time = Utilities.formatDate(now, Session.getScriptTimeZone(), 'HH:mm:ss');
+  const date = formatSheetDate(now);
+  const time = formatSheetTime(now);
   const patientName = body.patientName || '';
 
   const sheet = getSheet(SHEETS.SALES);
   const rows = body.items.map(function(item) {
-    return [
-      invoiceNo, date, time, patientName,
-      item.itemName, item.category, item.qty,
-      item.unitPrice, item.lineTotal,
-    ];
+    const itemName = item.itemName || item.name || '';
+    const category = item.category || '';
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unitPrice != null ? item.unitPrice : item.price) || 0;
+    return [invoiceNo, date, time, patientName, itemName, category, qty, unitPrice];
   });
 
   const startRow = sheet.getLastRow() + 1;
-  sheet.getRange(startRow, 1, rows.length, 9).setValues(rows);
+  sheet.getRange(startRow, 1, startRow + rows.length - 1, SALES_HEADERS.length).setValues(rows);
 
   const total = body.items.reduce(function(sum, item) {
-    return sum + (Number(item.lineTotal) || 0);
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unitPrice != null ? item.unitPrice : item.price) || 0;
+    return sum + lineTotal(qty, unitPrice);
   }, 0);
 
-  updateDailySummary(date);
+  updateDailySummary();
 
   return {
     success: true,
@@ -334,12 +413,10 @@ function saveSale(body) {
 
 // ── Daily Summary ────────────────────────────────────────────────
 
-function updateDailySummary(date) {
+function updateDailySummary() {
   const salesSheet = getSheet(SHEETS.SALES);
   const salesData = salesSheet.getDataRange().getValues();
   const summarySheet = getSheet(SHEETS.DAILY_SUMMARY);
-
-  // Collect unique dates and their stats from Sales
   const dayStats = {};
 
   for (let i = 1; i < salesData.length; i++) {
@@ -347,28 +424,32 @@ function updateDailySummary(date) {
     if (!row[0]) continue;
     const d = String(row[1]);
     const invoiceNo = String(row[0]);
-    const lineTotal = Number(row[8]) || 0;
+    const qty = Number(row[6]) || 0;
+    const unitPrice = Number(row[7]) || 0;
+    const rowTotal = lineTotal(qty, unitPrice);
 
     if (!dayStats[d]) {
       dayStats[d] = { invoices: {}, revenue: 0 };
     }
     dayStats[d].invoices[invoiceNo] = true;
-    dayStats[d].revenue += lineTotal;
+    dayStats[d].revenue += rowTotal;
   }
 
-  // Rebuild Daily Summary sheet
   summarySheet.clear();
   summarySheet.getRange(1, 1, 1, 3).setValues([['Date', 'Total Invoices', 'Total Revenue (PKR)']]);
   summarySheet.getRange(1, 1, 1, 3).setFontWeight('bold');
   summarySheet.setFrozenRows(1);
 
-  const sortedDates = Object.keys(dayStats).sort();
+  const sortedDates = Object.keys(dayStats).sort(function(a, b) {
+    const da = parseDateStr(a);
+    const db = parseDateStr(b);
+    if (!da || !db) return a.localeCompare(b);
+    return da.getTime() - db.getTime();
+  });
 
   let row = 2;
   sortedDates.forEach(function(d, idx) {
-    if (idx > 0) {
-      row++; // blank row between days
-    }
+    if (idx > 0) row++;
     const stats = dayStats[d];
     const invoiceCount = Object.keys(stats.invoices).length;
     summarySheet.getRange(row, 1, 1, 3).setValues([[d, invoiceCount, stats.revenue]]);
@@ -388,6 +469,10 @@ function getHistory() {
     if (!row[0]) continue;
 
     const invoiceNo = String(row[0]);
+    const qty = Number(row[6]) || 0;
+    const unitPrice = Number(row[7]) || 0;
+    const rowTotal = lineTotal(qty, unitPrice);
+
     if (!invoiceMap[invoiceNo]) {
       invoiceMap[invoiceNo] = {
         invoiceNo: invoiceNo,
@@ -399,18 +484,16 @@ function getHistory() {
       };
     }
 
-    const lineTotal = Number(row[8]) || 0;
     invoiceMap[invoiceNo].items.push({
       itemName: String(row[4]),
       category: String(row[5]),
-      qty: Number(row[6]) || 0,
-      unitPrice: Number(row[7]) || 0,
-      lineTotal: lineTotal,
+      qty: qty,
+      unitPrice: unitPrice,
+      lineTotal: rowTotal,
     });
-    invoiceMap[invoiceNo].total += lineTotal;
+    invoiceMap[invoiceNo].total += rowTotal;
   }
 
-  // Group by date
   const dayMap = {};
   Object.keys(invoiceMap).forEach(function(key) {
     const inv = invoiceMap[key];
@@ -421,7 +504,12 @@ function getHistory() {
     dayMap[inv.date].totalRevenue += inv.total;
   });
 
-  const days = Object.keys(dayMap).sort().reverse().map(function(d) {
+  const days = Object.keys(dayMap).sort(function(a, b) {
+    const da = parseDateStr(a);
+    const db = parseDateStr(b);
+    if (!da || !db) return b.localeCompare(a);
+    return db.getTime() - da.getTime();
+  }).map(function(d) {
     const day = dayMap[d];
     day.invoices.sort(function(a, b) { return b.time.localeCompare(a.time); });
     return day;

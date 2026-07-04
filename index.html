@@ -34,8 +34,9 @@
       </div>
 
       <div class="form-group">
-        <label for="patient-name">Patient Name <span style="font-weight:400;color:var(--gray-500)">(optional)</span></label>
-        <input type="text" id="patient-name" placeholder="Enter patient name">
+        <label for="patient-name">Patient Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="patient-name" placeholder="Enter patient name" required>
+        <span class="field-error" id="patient-error">Patient name is required</span>
       </div>
     </div>
 
@@ -60,7 +61,7 @@
         <span class="total-amount" id="grand-total">PKR 0</span>
       </div>
       <div class="btn-group" style="margin-top:1rem">
-        <button class="btn btn-gold" id="btn-save-print" disabled>Save &amp; Print Invoice</button>
+        <button class="btn btn-gold" id="btn-save" disabled>Save Invoice</button>
         <button class="btn btn-outline" id="btn-clear-cart">Clear Cart</button>
       </div>
     </div>
@@ -69,8 +70,6 @@
       Search and select items above to start a sale.
     </div>
   </main>
-
-  <div id="print-area"></div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
@@ -85,8 +84,10 @@
     const emptyCart = document.getElementById('empty-cart');
     const cartBody = document.getElementById('cart-body');
     const grandTotal = document.getElementById('grand-total');
-    const btnSavePrint = document.getElementById('btn-save-print');
+    const btnSave = document.getElementById('btn-save');
     const btnClearCart = document.getElementById('btn-clear-cart');
+    const patientInput = document.getElementById('patient-name');
+    const patientError = document.getElementById('patient-error');
 
     setActiveNav('pos');
 
@@ -146,12 +147,12 @@
       if (!cart.length) {
         cartSection.style.display = 'none';
         emptyCart.style.display = 'block';
-        btnSavePrint.disabled = true;
+        btnSave.disabled = true;
         return;
       }
       cartSection.style.display = 'block';
       emptyCart.style.display = 'none';
-      btnSavePrint.disabled = false;
+      btnSave.disabled = false;
 
       let total = 0;
       cartBody.innerHTML = cart.map((item, idx) => {
@@ -250,43 +251,50 @@
       }
     });
 
-    btnSavePrint.addEventListener('click', async () => {
+    patientInput.addEventListener('input', () => {
+      patientInput.classList.remove('input-error');
+      patientError.classList.remove('visible');
+    });
+
+    btnSave.addEventListener('click', async () => {
       if (!cart.length) return;
-      btnSavePrint.disabled = true;
-      btnSavePrint.textContent = 'Saving…';
+
+      const patientName = patientInput.value.trim();
+      if (!patientName) {
+        patientInput.classList.add('input-error');
+        patientError.classList.add('visible');
+        patientInput.focus();
+        showToast('Patient name is required', 'error');
+        return;
+      }
+
+      btnSave.disabled = true;
+      btnSave.textContent = 'Saving…';
 
       const payload = {
         action: 'sale',
-        patientName: document.getElementById('patient-name').value.trim(),
+        patientName: patientName,
         items: cart.map(item => ({
           itemName: item.name,
           category: item.category,
           qty: item.qty,
           unitPrice: Number(item.unitPrice) || 0,
-          lineTotal: item.qty * (Number(item.unitPrice) || 0),
         })),
       };
 
       try {
         const result = await apiPost(payload);
-        const invoice = {
-          invoiceNo: result.invoiceNo,
-          date: result.date,
-          time: result.time,
-          patientName: payload.patientName,
-          items: payload.items,
-          total: result.total,
-        };
-        printReceipt(invoice);
-        showToast('Invoice ' + result.invoiceNo + ' saved!', 'success');
+        showToast('Invoice saved successfully — ' + result.invoiceNo, 'success');
         cart = [];
-        document.getElementById('patient-name').value = '';
+        patientInput.value = '';
+        patientInput.classList.remove('input-error');
+        patientError.classList.remove('visible');
         renderCart();
       } catch (err) {
         showToast('Save failed: ' + err.message, 'error');
+        btnSave.disabled = false;
       } finally {
-        btnSavePrint.disabled = cart.length === 0;
-        btnSavePrint.textContent = 'Save & Print Invoice';
+        btnSave.textContent = 'Save Invoice';
       }
     });
 

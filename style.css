@@ -357,6 +357,39 @@ td.num, th.num { text-align: right; }
 
 .history-row:hover { background: rgba(201, 168, 76, 0.1) !important; }
 
+.history-row.expanded { background: rgba(0, 51, 102, 0.06) !important; }
+
+.invoice-detail-row td {
+  padding: 0 !important;
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gold);
+}
+
+.invoice-detail {
+  padding: 1rem;
+}
+
+.invoice-detail-meta {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  margin-bottom: 0.75rem;
+}
+
+.field-error {
+  display: none;
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+  font-weight: 500;
+}
+
+.field-error.visible { display: block; }
+
+input.input-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+}
+
 .filter-bar {
   display: flex;
   gap: 0.75rem;
