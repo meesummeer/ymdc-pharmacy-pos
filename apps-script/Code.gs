@@ -170,6 +170,9 @@ function setupSheet(ss, name, headers) {
 
 function parseDateStr(dateStr) {
   if (!dateStr) return null;
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    return new Date(dateStr.getFullYear(), dateStr.getMonth(), dateStr.getDate());
+  }
   const s = String(dateStr).trim();
   if (s.indexOf('/') !== -1) {
     const parts = s.split('/');
@@ -193,8 +196,24 @@ function formatSheetTime(date) {
   return Utilities.formatDate(date, Session.getScriptTimeZone(), 'hh:mm a');
 }
 
-function lineTotal(qty, unitPrice) {
-  return (Number(qty) || 0) * (Number(unitPrice) || 0);
+function normalizeCellDate(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return formatSheetDate(value);
+  }
+  return String(value || '').trim();
+}
+
+function readSaleItem(row) {
+  return {
+    name: String(row[4] || ''),
+    category: String(row[5] || ''),
+    qty: Number(row[6]) || 0,
+    price: Number(row[7]) || 0,
+  };
+}
+
+function lineTotal(qty, price) {
+  return (Number(qty) || 0) * (Number(price) || 0);
 }
 
 // ── Preloaded inventory ──────────────────────────────────────────
@@ -383,21 +402,19 @@ function saveSale(body) {
   const patientName = body.patientName || '';
 
   const sheet = getSheet(SHEETS.SALES);
-  const rows = body.items.map(function(item) {
-    const itemName = item.itemName || item.name || '';
-    const category = item.category || '';
-    const qty = Number(item.qty) || 0;
-    const unitPrice = Number(item.unitPrice != null ? item.unitPrice : item.price) || 0;
-    return [invoiceNo, date, time, patientName, itemName, category, qty, unitPrice];
-  });
 
-  const startRow = sheet.getLastRow() + 1;
-  sheet.getRange(startRow, 1, startRow + rows.length - 1, SALES_HEADERS.length).setValues(rows);
+  body.items.forEach(function(item) {
+    const name = String(item.name || item.itemName || '');
+    const category = String(item.category || '');
+    const qty = Number(item.qty) || 0;
+    const price = Number(item.price != null ? item.price : item.unitPrice) || 0;
+    sheet.appendRow([invoiceNo, date, time, patientName, name, category, qty, price]);
+  });
 
   const total = body.items.reduce(function(sum, item) {
     const qty = Number(item.qty) || 0;
-    const unitPrice = Number(item.unitPrice != null ? item.unitPrice : item.price) || 0;
-    return sum + lineTotal(qty, unitPrice);
+    const price = Number(item.price != null ? item.price : item.unitPrice) || 0;
+    return sum + lineTotal(qty, price);
   }, 0);
 
   updateDailySummary();
@@ -422,11 +439,10 @@ function updateDailySummary() {
   for (let i = 1; i < salesData.length; i++) {
     const row = salesData[i];
     if (!row[0]) continue;
-    const d = String(row[1]);
+    const d = normalizeCellDate(row[1]);
     const invoiceNo = String(row[0]);
-    const qty = Number(row[6]) || 0;
-    const unitPrice = Number(row[7]) || 0;
-    const rowTotal = lineTotal(qty, unitPrice);
+    const item = readSaleItem(row);
+    const rowTotal = lineTotal(item.qty, item.price);
 
     if (!dayStats[d]) {
       dayStats[d] = { invoices: {}, revenue: 0 };
@@ -469,14 +485,13 @@ function getHistory() {
     if (!row[0]) continue;
 
     const invoiceNo = String(row[0]);
-    const qty = Number(row[6]) || 0;
-    const unitPrice = Number(row[7]) || 0;
-    const rowTotal = lineTotal(qty, unitPrice);
+    const item = readSaleItem(row);
+    const rowTotal = lineTotal(item.qty, item.price);
 
     if (!invoiceMap[invoiceNo]) {
       invoiceMap[invoiceNo] = {
         invoiceNo: invoiceNo,
-        date: String(row[1]),
+        date: normalizeCellDate(row[1]),
         time: String(row[2]),
         patientName: String(row[3]),
         items: [],
@@ -485,10 +500,10 @@ function getHistory() {
     }
 
     invoiceMap[invoiceNo].items.push({
-      itemName: String(row[4]),
-      category: String(row[5]),
-      qty: qty,
-      unitPrice: unitPrice,
+      name: item.name,
+      category: item.category,
+      qty: item.qty,
+      price: item.price,
       lineTotal: rowTotal,
     });
     invoiceMap[invoiceNo].total += rowTotal;

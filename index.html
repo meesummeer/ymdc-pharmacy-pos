@@ -271,19 +271,21 @@
       btnSave.disabled = true;
       btnSave.textContent = 'Saving…';
 
-      const payload = {
+      const saleData = {
         action: 'sale',
         patientName: patientName,
         items: cart.map(item => ({
-          itemName: item.name,
+          name: item.name,
           category: item.category,
           qty: item.qty,
-          unitPrice: Number(item.unitPrice) || 0,
+          price: Number(item.unitPrice) || 0,
         })),
       };
 
+      console.log(JSON.stringify(saleData));
+
       try {
-        const result = await apiPost(payload);
+        const result = await apiPost(saleData);
         showToast('Invoice saved successfully — ' + result.invoiceNo, 'success');
         cart = [];
         patientInput.value = '';

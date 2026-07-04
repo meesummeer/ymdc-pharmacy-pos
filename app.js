@@ -53,8 +53,18 @@ function formatPKR(amount) {
   return 'PKR ' + n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function formatDateFromParts(d) {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function parseSheetDate(dateStr) {
   if (!dateStr) return null;
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    return new Date(dateStr.getFullYear(), dateStr.getMonth(), dateStr.getDate());
+  }
   const s = String(dateStr).trim();
   if (s.includes('/')) {
     const [d, m, y] = s.split('/');
@@ -67,42 +77,42 @@ function parseSheetDate(dateStr) {
     }
   }
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function formatDate(dateStr) {
   const d = parseSheetDate(dateStr);
   if (!d) return dateStr || '';
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  return formatDateFromParts(d);
 }
 
-function toInputDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function parseFilterDate(dmyStr) {
+  if (!dmyStr) return null;
+  const parts = String(dmyStr).trim().split('/');
+  if (parts.length !== 3) return null;
+  const d = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const y = parseInt(parts[2], 10);
+  if (!d || !m || !y) return null;
+  return new Date(y, m - 1, d);
 }
 
 function getCurrentMonthRange() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { from: toInputDate(first), to: toInputDate(last) };
+  return { from: formatDateFromParts(first), to: formatDateFromParts(last) };
 }
 
-function dateInRange(dateStr, fromIso, toIso) {
+function dateInRange(dateStr, fromDMY, toDMY) {
   const d = parseSheetDate(dateStr);
   if (!d) return true;
-  if (fromIso) {
-    const from = new Date(fromIso + 'T00:00:00');
-    if (d < from) return false;
-  }
-  if (toIso) {
-    const to = new Date(toIso + 'T23:59:59');
-    if (d > to) return false;
+  const from = parseFilterDate(fromDMY);
+  const to = parseFilterDate(toDMY);
+  if (from && d < from) return false;
+  if (to) {
+    const toEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
+    if (d > toEnd) return false;
   }
   return true;
 }
