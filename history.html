@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>History — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Yaseen Medical &amp; General Store</h1>
+        <span class="short">YMDC</span>
+      </div>
+      <nav class="main-nav">
+        <a href="index.html" class="nav-link" data-page="pos">POS</a>
+        <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+        <a href="history.html" class="nav-link active" data-page="history">History</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <h2 class="page-title">Invoice History</h2>
+
+    <div class="filter-bar card" style="padding:1rem">
+      <div class="form-group">
+        <label for="date-from">From</label>
+        <input type="date" id="date-from">
+      </div>
+      <div class="form-group">
+        <label for="date-to">To</label>
+        <input type="date" id="date-to">
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-filter" style="margin-bottom:0">Filter</button>
+      <button class="btn btn-outline btn-sm" id="btn-clear-filter" style="margin-bottom:0">Clear</button>
+    </div>
+
+    <div id="history-container">
+      <div class="card loading">Loading history</div>
+    </div>
+  </main>
+
+  <!-- Invoice Detail Modal -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <h3 id="detail-title">Invoice Details</h3>
+        <button class="modal-close" id="detail-close">&times;</button>
+      </div>
+      <div class="modal-body" id="detail-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-gold" id="detail-print">Print</button>
+        <button class="btn btn-outline" id="detail-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="print-area"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let allHistory = [];
+    let currentInvoice = null;
+
+    const historyContainer = document.getElementById('history-container');
+    const detailModal = document.getElementById('detail-modal');
+    const detailBody = document.getElementById('detail-body');
+    const detailTitle = document.getElementById('detail-title');
+
+    setActiveNav('history');
+
+    async function loadHistory() {
+      historyContainer.innerHTML = '<div class="card loading">Loading history</div>';
+      try {
+        const data = await apiGet('history');
+        allHistory = data.days || [];
+        renderHistory();
+      } catch (err) {
+        historyContainer.innerHTML = `<div class="card empty-state">Failed to load: ${escapeHtml(err.message)}</div>`;
+        showToast('Failed to load history: ' + err.message, 'error');
+      }
+    }
+
+    function getDateFilter() {
+      return {
+        from: document.getElementById('date-from').value,
+        to: document.getElementById('date-to').value,
+      };
+    }
+
+    function renderHistory() {
+      const { from, to } = getDateFilter();
+      let days = allHistory;
+
+      if (from) days = days.filter(d => d.date >= from);
+      if (to) days = days.filter(d => d.date <= to);
+
+      if (!days.length) {
+        historyContainer.innerHTML = '<div class="card empty-state">No invoices found.</div>';
+        return;
+      }
+
+      historyContainer.innerHTML = days.map(day => `
+        <div class="date-separator">${formatDate(day.date)}</div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice No</th>
+                  <th>Time</th>
+                  <th>Patient</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${day.invoices.map(inv => `
+                  <tr class="history-row" data-invoice="${escapeHtml(inv.invoiceNo)}">
+                    <td>${escapeHtml(inv.invoiceNo)}</td>
+                    <td>${escapeHtml(inv.time)}</td>
+                    <td>${inv.patientName ? escapeHtml(inv.patientName) : '—'}</td>
+                    <td class="num">${formatPKR(inv.total)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.5rem 0.75rem;background:var(--gray-50);font-size:0.85rem;color:var(--gray-700);text-align:right">
+            ${day.invoices.length} invoice${day.invoices.length !== 1 ? 's' : ''} &middot; Revenue: <strong>${formatPKR(day.totalRevenue)}</strong>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showInvoiceDetail(invoiceNo) {
+      for (const day of allHistory) {
+        const inv = day.invoices.find(i => i.invoiceNo === invoiceNo);
+        if (inv) {
+          currentInvoice = inv;
+          detailTitle.textContent = inv.invoiceNo;
+          detailBody.innerHTML = `
+            <p style="margin-bottom:0.5rem"><strong>Date:</strong> ${formatDate(inv.date)} &nbsp; <strong>Time:</strong> ${escapeHtml(inv.time)}</p>
+            ${inv.patientName ? `<p style="margin-bottom:0.75rem"><strong>Patient:</strong> ${escapeHtml(inv.patientName)}</p>` : ''}
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th class="num">Qty</th>
+                    <th class="num">Price</th>
+                    <th class="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${inv.items.map(item => `
+                    <tr>
+                      <td>${escapeHtml(item.itemName)}</td>
+                      <td>${escapeHtml(item.category)}</td>
+                      <td class="num">${item.qty}</td>
+                      <td class="num">${formatPKR(item.unitPrice)}</td>
+                      <td class="num">${formatPKR(item.lineTotal)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="4" style="text-align:right;font-weight:700">Total</td>
+                    <td class="num" style="font-weight:700">${formatPKR(inv.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          `;
+          detailModal.classList.add('open');
+          return;
+        }
+      }
+    }
+
+    historyContainer.addEventListener('click', (e) => {
+      const row = e.target.closest('.history-row[data-invoice]');
+      if (row) showInvoiceDetail(row.dataset.invoice);
+    });
+
+    document.getElementById('detail-close').addEventListener('click', () => detailModal.classList.remove('open'));
+    document.getElementById('detail-dismiss').addEventListener('click', () => detailModal.classList.remove('open'));
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) detailModal.classList.remove('open');
+    });
+
+    document.getElementById('detail-print').addEventListener('click', () => {
+      if (currentInvoice) {
+        printReceipt(currentInvoice);
+      }
+    });
+
+    document.getElementById('btn-filter').addEventListener('click', renderHistory);
+    document.getElementById('btn-clear-filter').addEventListener('click', () => {
+      document.getElementById('date-from').value = '';
+      document.getElementById('date-to').value = '';
+      renderHistory();
+    });
+
+    loadHistory();
+  </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POS — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Yaseen Medical &amp; General Store</h1>
+        <span class="short">YMDC</span>
+      </div>
+      <nav class="main-nav">
+        <a href="index.html" class="nav-link active" data-page="pos">POS</a>
+        <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+        <a href="history.html" class="nav-link" data-page="history">History</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <h2 class="page-title">Point of Sale</h2>
+
+    <div class="card">
+      <div class="form-group">
+        <label for="search-input">Search Item</label>
+        <div class="search-wrapper">
+          <input type="text" id="search-input" placeholder="Type item name…" autocomplete="off">
+          <div id="search-dropdown" class="search-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="patient-name">Patient Name <span style="font-weight:400;color:var(--gray-500)">(optional)</span></label>
+        <input type="text" id="patient-name" placeholder="Enter patient name">
+      </div>
+    </div>
+
+    <div class="card" id="cart-section" style="display:none">
+      <h3 style="margin-bottom:0.75rem;color:var(--navy)">Cart</h3>
+      <div class="table-wrapper">
+        <table id="cart-table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Qty</th>
+              <th class="num">Unit Price (PKR)</th>
+              <th class="num">Line Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cart-body"></tbody>
+        </table>
+      </div>
+      <div class="cart-total-bar">
+        <span>Grand Total</span>
+        <span class="total-amount" id="grand-total">PKR 0</span>
+      </div>
+      <div class="btn-group" style="margin-top:1rem">
+        <button class="btn btn-gold" id="btn-save-print" disabled>Save &amp; Print Invoice</button>
+        <button class="btn btn-outline" id="btn-clear-cart">Clear Cart</button>
+      </div>
+    </div>
+
+    <div id="empty-cart" class="card empty-state">
+      Search and select items above to start a sale.
+    </div>
+  </main>
+
+  <div id="print-area"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let inventory = [];
+    let cart = [];
+    let highlightIndex = -1;
+
+    const searchInput = document.getElementById('search-input');
+    const searchDropdown = document.getElementById('search-dropdown');
+    const cartSection = document.getElementById('cart-section');
+    const emptyCart = document.getElementById('empty-cart');
+    const cartBody = document.getElementById('cart-body');
+    const grandTotal = document.getElementById('grand-total');
+    const btnSavePrint = document.getElementById('btn-save-print');
+    const btnClearCart = document.getElementById('btn-clear-cart');
+
+    setActiveNav('pos');
+
+    async function loadInventory() {
+      try {
+        const data = await apiGet('inventory');
+        inventory = data.items || [];
+      } catch (err) {
+        showToast('Failed to load inventory: ' + err.message, 'error');
+        inventory = [];
+      }
+    }
+
+    function getFilteredItems(query) {
+      if (!query) return [];
+      const q = query.toLowerCase();
+      return inventory.filter(item =>
+        item.name.toLowerCase().includes(q)
+      ).slice(0, 20);
+    }
+
+    function renderDropdown(items) {
+      if (!items.length) {
+        searchDropdown.classList.remove('open');
+        return;
+      }
+      searchDropdown.innerHTML = items.map((item, i) => `
+        <div class="search-dropdown-item${i === highlightIndex ? ' highlighted' : ''}"
+             data-id="${item.id}" data-index="${i}">
+          <span>${escapeHtml(item.name)}</span>
+          <span class="cat-badge">${escapeHtml(item.category)}</span>
+        </div>
+      `).join('');
+      searchDropdown.classList.add('open');
+    }
+
+    function addToCart(item) {
+      const existing = cart.find(c => c.id === item.id);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          qty: 1,
+          unitPrice: item.price || 0,
+        });
+      }
+      searchInput.value = '';
+      searchDropdown.classList.remove('open');
+      highlightIndex = -1;
+      renderCart();
+    }
+
+    function renderCart() {
+      if (!cart.length) {
+        cartSection.style.display = 'none';
+        emptyCart.style.display = 'block';
+        btnSavePrint.disabled = true;
+        return;
+      }
+      cartSection.style.display = 'block';
+      emptyCart.style.display = 'none';
+      btnSavePrint.disabled = false;
+
+      let total = 0;
+      cartBody.innerHTML = cart.map((item, idx) => {
+        const lineTotal = item.qty * (Number(item.unitPrice) || 0);
+        total += lineTotal;
+        return `
+          <tr>
+            <td>${escapeHtml(item.name)}</td>
+            <td>
+              <div class="qty-controls">
+                <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, -1)">−</button>
+                <input type="number" value="${item.qty}" min="1"
+                       onchange="setQty(${idx}, this.value)" class="qty-input">
+                <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, 1)">+</button>
+              </div>
+            </td>
+            <td class="num">
+              <input type="number" class="price-input" value="${item.unitPrice}" min="0" step="1"
+                     onchange="setPrice(${idx}, this.value)">
+            </td>
+            <td class="num">${formatPKR(lineTotal)}</td>
+            <td>
+              <button class="btn btn-sm btn-danger btn-icon" onclick="removeItem(${idx})" title="Remove">×</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      grandTotal.textContent = formatPKR(total);
+    }
+
+    window.changeQty = function(idx, delta) {
+      cart[idx].qty = Math.max(1, cart[idx].qty + delta);
+      renderCart();
+    };
+
+    window.setQty = function(idx, val) {
+      cart[idx].qty = Math.max(1, parseInt(val) || 1);
+      renderCart();
+    };
+
+    window.setPrice = function(idx, val) {
+      cart[idx].unitPrice = Math.max(0, parseFloat(val) || 0);
+      renderCart();
+    };
+
+    window.removeItem = function(idx) {
+      cart.splice(idx, 1);
+      renderCart();
+    };
+
+    searchInput.addEventListener('input', () => {
+      highlightIndex = -1;
+      const items = getFilteredItems(searchInput.value.trim());
+      renderDropdown(items);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      const items = getFilteredItems(searchInput.value.trim());
+      if (!items.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightIndex = Math.min(highlightIndex + 1, items.length - 1);
+        renderDropdown(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightIndex = Math.max(highlightIndex - 1, 0);
+        renderDropdown(items);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const idx = highlightIndex >= 0 ? highlightIndex : 0;
+        addToCart(items[idx]);
+      } else if (e.key === 'Escape') {
+        searchDropdown.classList.remove('open');
+      }
+    });
+
+    searchDropdown.addEventListener('click', (e) => {
+      const el = e.target.closest('.search-dropdown-item');
+      if (!el) return;
+      const item = inventory.find(i => i.id === el.dataset.id);
+      if (item) addToCart(item);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrapper')) {
+        searchDropdown.classList.remove('open');
+      }
+    });
+
+    btnClearCart.addEventListener('click', () => {
+      if (cart.length && confirm('Clear the entire cart?')) {
+        cart = [];
+        renderCart();
+      }
+    });
+
+    btnSavePrint.addEventListener('click', async () => {
+      if (!cart.length) return;
+      btnSavePrint.disabled = true;
+      btnSavePrint.textContent = 'Saving…';
+
+      const payload = {
+        action: 'sale',
+        patientName: document.getElementById('patient-name').value.trim(),
+        items: cart.map(item => ({
+          itemName: item.name,
+          category: item.category,
+          qty: item.qty,
+          unitPrice: Number(item.unitPrice) || 0,
+          lineTotal: item.qty * (Number(item.unitPrice) || 0),
+        })),
+      };
+
+      try {
+        const result = await apiPost(payload);
+        const invoice = {
+          invoiceNo: result.invoiceNo,
+          date: result.date,
+          time: result.time,
+          patientName: payload.patientName,
+          items: payload.items,
+          total: result.total,
+        };
+        printReceipt(invoice);
+        showToast('Invoice ' + result.invoiceNo + ' saved!', 'success');
+        cart = [];
+        document.getElementById('patient-name').value = '';
+        renderCart();
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      } finally {
+        btnSavePrint.disabled = cart.length === 0;
+        btnSavePrint.textContent = 'Save & Print Invoice';
+      }
+    });
+
+    loadInventory();
+  </script>
+</body>
+</html>
