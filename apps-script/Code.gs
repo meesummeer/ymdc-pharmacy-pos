@@ -30,7 +30,7 @@ function doGet(e) {
       case 'inventory':
         return jsonResponse({ items: getInventory() });
       case 'history':
-        return jsonResponse({ days: getHistory(), invoices: getAllInvoices() });
+        return jsonResponse(getHistoryData());
       default:
         return jsonResponse({ error: 'Unknown action. Use ?action=inventory or ?action=history' });
     }
@@ -188,11 +188,11 @@ function parseDateStr(dateStr) {
 }
 
 function formatSheetDate(date) {
-  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  return Utilities.formatDate(date, 'Asia/Karachi', 'dd/MM/yyyy');
 }
 
 function formatSheetTime(date) {
-  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'hh:mm a');
+  return Utilities.formatDate(date, 'Asia/Karachi', 'hh:mm a');
 }
 
 function normalizeCellDate(value) {
@@ -400,11 +400,12 @@ function saveSale(body) {
 
   const invoiceNo = getNextInvoiceNo();
   const now = new Date();
-  const date = formatSheetDate(now);
-  const time = formatSheetTime(now);
+  const date = body.date ? String(body.date) : formatSheetDate(now);
+  const time = body.time ? String(body.time) : formatSheetTime(now);
   const patientName = body.patientName || '';
 
   const sheet = getSheet(SHEETS.SALES);
+  migrateSalesSheet();
 
   body.items.forEach(function(item) {
     const name = String(item.name || '');
@@ -476,16 +477,16 @@ function updateDailySummary() {
 
 // ── History ──────────────────────────────────────────────────────
 
-function getHistory() {
+function getHistoryData() {
   const sheet = getSheet(SHEETS.SALES);
   const data = sheet.getDataRange().getValues();
   const invoiceMap = {};
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (!row[0]) continue;
+    const invoiceNo = String(row[0] || '').trim();
+    if (!invoiceNo) continue;
 
-    const invoiceNo = String(row[0]);
     const item = readSaleItem(row);
     const rowTotal = lineTotal(item.qty, item.price);
 
@@ -493,8 +494,8 @@ function getHistory() {
       invoiceMap[invoiceNo] = {
         invoiceNo: invoiceNo,
         date: normalizeCellDate(row[1]),
-        time: String(row[2]),
-        patientName: String(row[3]),
+        time: String(row[2] || '').trim(),
+        patientName: String(row[3] || '').trim(),
         items: [],
         total: 0,
       };
@@ -510,9 +511,21 @@ function getHistory() {
     invoiceMap[invoiceNo].total += rowTotal;
   }
 
+  const invoices = Object.keys(invoiceMap).map(function(key) {
+    return invoiceMap[key];
+  });
+
+  invoices.sort(function(a, b) {
+    const da = parseDateStr(a.date);
+    const db = parseDateStr(b.date);
+    if (da && db && da.getTime() !== db.getTime()) {
+      return db.getTime() - da.getTime();
+    }
+    return String(b.time).localeCompare(String(a.time));
+  });
+
   const dayMap = {};
-  Object.keys(invoiceMap).forEach(function(key) {
-    const inv = invoiceMap[key];
+  invoices.forEach(function(inv) {
     if (!dayMap[inv.date]) {
       dayMap[inv.date] = { date: inv.date, invoices: [], totalRevenue: 0 };
     }
@@ -526,21 +539,16 @@ function getHistory() {
     if (!da || !db) return b.localeCompare(a);
     return db.getTime() - da.getTime();
   }).map(function(d) {
-    const day = dayMap[d];
-    day.invoices.sort(function(a, b) { return b.time.localeCompare(a.time); });
-    return day;
+    return dayMap[d];
   });
 
-  return days;
+  return { days: days, invoices: invoices };
+}
+
+function getHistory() {
+  return getHistoryData().days;
 }
 
 function getAllInvoices() {
-  const days = getHistory();
-  const invoices = [];
-  days.forEach(function(day) {
-    day.invoices.forEach(function(inv) {
-      invoices.push(inv);
-    });
-  });
-  return invoices;
+  return getHistoryData().invoices;
 }

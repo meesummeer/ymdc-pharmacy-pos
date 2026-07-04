@@ -45,7 +45,6 @@
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
-    let allHistory = [];
     let allInvoices = [];
     let expandedInvoice = null;
 
@@ -59,13 +58,27 @@
       document.getElementById('date-to').value = range.to;
     }
 
+    function normalizeInvoices(data) {
+      if (Array.isArray(data.invoices) && data.invoices.length) {
+        return data.invoices;
+      }
+      if (Array.isArray(data.days)) {
+        const fromDays = data.days.flatMap(day => day.invoices || []);
+        if (fromDays.length) return fromDays;
+      }
+      return [];
+    }
+
     async function loadHistory() {
       historyContainer.innerHTML = '<div class="card loading">Loading history</div>';
       try {
         const data = await apiGet('history');
-        console.log('History API response:', JSON.stringify(data));
-        allHistory = data.days || [];
-        allInvoices = data.invoices || allHistory.flatMap(day => day.invoices || []);
+        console.log('RAW RESPONSE:', JSON.stringify(data));
+        console.log('INVOICES ARRAY:', data.invoices);
+        console.log('FIRST INVOICE:', data.invoices?.[0]);
+
+        allInvoices = normalizeInvoices(data);
+        console.log('NORMALIZED INVOICES:', allInvoices.length, allInvoices[0]);
         renderHistory();
       } catch (err) {
         historyContainer.innerHTML = `<div class="card empty-state">Failed to load: ${escapeHtml(err.message)}</div>`;
@@ -80,44 +93,50 @@
       };
     }
 
-    function renderInvoiceDetail(inv) {
+    function renderInvoiceCard(inv) {
+      const isExpanded = expandedInvoice === inv.invoiceNo;
+      const items = inv.items || [];
+
       return `
-        <tr class="invoice-detail-row">
-          <td colspan="5">
-            <div class="invoice-detail">
+        <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoiceNo)}">
+          <div class="invoice-card-header history-row">
+            <div class="invoice-card-main">
+              <span class="invoice-card-no">${escapeHtml(inv.invoiceNo)} ${isExpanded ? '▾' : '▸'}</span>
+              <span class="invoice-card-meta">
+                <strong>Date:</strong> ${formatDate(inv.date)} &nbsp;
+                <strong>Time:</strong> ${escapeHtml(inv.time || '—')} &nbsp;
+                <strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}
+              </span>
+            </div>
+            <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+          </div>
+          ${isExpanded ? `
+            <div class="invoice-card-body">
               <div class="table-wrapper">
                 <table>
                   <thead>
                     <tr>
-                      <th>Item</th>
+                      <th>Item Name</th>
                       <th>Category</th>
                       <th class="num">Qty</th>
                       <th class="num">Unit Price</th>
-                      <th class="num">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    ${inv.items.map(item => `
+                    ${items.map(item => `
                       <tr>
-                        <td>${escapeHtml(item.name || item.itemName)}</td>
-                        <td>${escapeHtml(item.category)}</td>
-                        <td class="num">${item.qty}</td>
-                        <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice)}</td>
-                        <td class="num">${formatPKR((item.qty || 0) * (item.price != null ? item.price : item.unitPrice || 0))}</td>
+                        <td>${escapeHtml(item.name || item.itemName || '—')}</td>
+                        <td>${escapeHtml(item.category || '—')}</td>
+                        <td class="num">${item.qty || 0}</td>
+                        <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice || 0)}</td>
                       </tr>
                     `).join('')}
                   </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colspan="4" style="text-align:right;font-weight:700">Total</td>
-                      <td class="num" style="font-weight:700">${formatPKR(inv.total)}</td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>
-          </td>
-        </tr>
+          ` : ''}
+        </div>
       `;
     }
 
@@ -126,69 +145,27 @@
       const filtered = allInvoices.filter(inv => dateInRange(inv.date, from, to));
 
       if (!filtered.length) {
-        historyContainer.innerHTML = '<div class="card empty-state">No invoices found for this period.</div>';
+        historyContainer.innerHTML = `<div class="card empty-state">No invoices found for this period.<br><small>Loaded ${allInvoices.length} total from server. Filter: ${escapeHtml(from)} – ${escapeHtml(to)}</small></div>`;
         return;
       }
 
-      const dayMap = {};
-      filtered.forEach(inv => {
-        const key = formatDate(inv.date);
-        if (!dayMap[key]) {
-          dayMap[key] = { date: inv.date, invoices: [], totalRevenue: 0 };
+      filtered.sort((a, b) => {
+        const da = parseDMYParts(formatDate(a.date));
+        const db = parseDMYParts(formatDate(b.date));
+        if (da && db) {
+          const diff = dmyToNumber(db) - dmyToNumber(da);
+          if (diff !== 0) return diff;
         }
-        dayMap[key].invoices.push(inv);
-        dayMap[key].totalRevenue += inv.total || 0;
+        return String(b.time || '').localeCompare(String(a.time || ''));
       });
 
-      const days = Object.keys(dayMap).sort((a, b) => {
-        const da = parseSheetDate(dayMap[a].date);
-        const db = parseSheetDate(dayMap[b].date);
-        if (!da || !db) return b.localeCompare(a);
-        return db - da;
-      }).map(key => dayMap[key]);
-
-      historyContainer.innerHTML = days.map(day => `
-        <div class="date-separator">${formatDate(day.date)}</div>
-        <div class="card" style="padding:0;overflow:hidden">
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Invoice No</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Patient Name</th>
-                  <th class="num">Total Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${day.invoices.map(inv => {
-                  const isExpanded = expandedInvoice === inv.invoiceNo;
-                  return `
-                    <tr class="history-row${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoiceNo)}">
-                      <td>${escapeHtml(inv.invoiceNo)}${isExpanded ? ' ▾' : ' ▸'}</td>
-                      <td>${formatDate(inv.date)}</td>
-                      <td>${escapeHtml(inv.time)}</td>
-                      <td>${inv.patientName ? escapeHtml(inv.patientName) : '—'}</td>
-                      <td class="num">${formatPKR(inv.total)}</td>
-                    </tr>
-                    ${isExpanded ? renderInvoiceDetail(inv) : ''}
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-          <div style="padding:0.5rem 0.75rem;background:var(--gray-50);font-size:0.85rem;color:var(--gray-700);text-align:right">
-            ${day.invoices.length} invoice${day.invoices.length !== 1 ? 's' : ''} &middot; Revenue: <strong>${formatPKR(day.totalRevenue)}</strong>
-          </div>
-        </div>
-      `).join('');
+      historyContainer.innerHTML = filtered.map(inv => renderInvoiceCard(inv)).join('');
     }
 
     historyContainer.addEventListener('click', (e) => {
-      const row = e.target.closest('.history-row[data-invoice]');
-      if (!row) return;
-      const invoiceNo = row.dataset.invoice;
+      const card = e.target.closest('.invoice-card[data-invoice]');
+      if (!card) return;
+      const invoiceNo = card.dataset.invoice;
       expandedInvoice = expandedInvoice === invoiceNo ? null : invoiceNo;
       renderHistory();
     });

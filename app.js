@@ -48,10 +48,24 @@ async function apiPost(body) {
 }
 
 // ── Sale payload builder ─────────────────────────────────────────
+function captureTimestamp() {
+  const now = new Date();
+  const date = formatDateFromParts(now);
+  const hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  const time = `${h12}:${minutes} ${ampm}`;
+  return { date, time };
+}
+
 function buildSaleData(cart, patientName) {
+  const { date, time } = captureTimestamp();
   return {
     action: 'sale',
     patientName: String(patientName || '').trim(),
+    date,
+    time,
     items: cart.map(item => ({
       name: String(item.name || ''),
       category: String(item.category || ''),
@@ -112,15 +126,23 @@ function formatDate(dateStr) {
   return formatDateFromParts(d);
 }
 
-function parseFilterDate(dmyStr) {
+function parseDMYParts(dmyStr) {
   if (!dmyStr) return null;
   const parts = String(dmyStr).trim().split('/');
   if (parts.length !== 3) return null;
-  const d = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10);
-  const y = parseInt(parts[2], 10);
-  if (!d || !m || !y) return null;
-  return new Date(y, m - 1, d);
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (!day || !month || !year) return null;
+  return { day, month, year };
+}
+
+function dmyToNumber(parts) {
+  return parts.year * 10000 + parts.month * 100 + parts.day;
+}
+
+function parseFilterDate(dmyStr) {
+  return parseDMYParts(dmyStr);
 }
 
 function getCurrentMonthRange() {
@@ -132,15 +154,14 @@ function getCurrentMonthRange() {
 
 function dateInRange(dateStr, fromDMY, toDMY) {
   if (!fromDMY && !toDMY) return true;
-  const d = parseSheetDate(dateStr);
-  if (!d) return false;
-  const from = parseFilterDate(fromDMY);
-  const to = parseFilterDate(toDMY);
-  if (from && d < from) return false;
-  if (to) {
-    const toEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
-    if (d > toEnd) return false;
-  }
+  const normalized = formatDate(dateStr);
+  const d = parseDMYParts(normalized);
+  if (!d) return true;
+  const dn = dmyToNumber(d);
+  const from = parseDMYParts(fromDMY);
+  const to = parseDMYParts(toDMY);
+  if (from && dn < dmyToNumber(from)) return false;
+  if (to && dn > dmyToNumber(to)) return false;
   return true;
 }
 

@@ -350,6 +350,68 @@ td.num, th.num { text-align: right; }
   background: var(--gold);
 }
 
+.invoice-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+}
+
+.invoice-card.expanded {
+  border-color: var(--gold);
+}
+
+.invoice-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.invoice-card-header:hover {
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.invoice-card.expanded .invoice-card-header {
+  background: rgba(0, 51, 102, 0.05);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.invoice-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.invoice-card-no {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.invoice-card-meta {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}
+
+.invoice-card-total {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.invoice-card-body {
+  padding: 0 1.25rem 1rem;
+  background: var(--gray-50);
+}
+
 .history-row {
   cursor: pointer;
   transition: background 0.15s;
