@@ -39,21 +39,47 @@ function doGet(e) {
   }
 }
 
+function isTextOutput(value) {
+  return value && typeof value.getMimeType === 'function';
+}
+
+function inventoryErrorOutput(message) {
+  return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: message, error: message }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
+  var body;
   try {
-    const body = JSON.parse(e.postData.contents);
-    const action = body.action;
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ status: 'error', error: 'Missing POST body', message: 'Missing POST body' });
+    }
+    body = JSON.parse(e.postData.contents);
+  } catch (parseErr) {
+    return jsonResponse({ status: 'error', error: 'Invalid JSON: ' + parseErr.message, message: parseErr.message });
+  }
+
+  try {
+    var action = body.action;
+    var result;
 
     switch (action) {
       case 'sale':
-        return jsonResponse(saveSale(body));
+        result = saveSale(body);
+        break;
       case 'inventory':
-        return jsonResponse(handleInventory(body));
+        result = handleInventory(body);
+        break;
       default:
-        return jsonResponse({ error: 'Unknown action' });
+        return jsonResponse({ status: 'error', error: 'Unknown action', message: 'Unknown action' });
     }
+
+    if (isTextOutput(result)) {
+      return result;
+    }
+    return jsonResponse(result);
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    return jsonResponse({ status: 'error', error: err.message, message: err.message });
   }
 }
 
@@ -363,21 +389,27 @@ function handleInventory(body) {
 
   if (op === 'add') {
     return addInventoryItem(body);
-  } else if (op === 'edit') {
+  }
+  if (op === 'edit') {
     return editInventoryItem(body);
-  } else if (op === 'delete') {
+  }
+  if (op === 'delete') {
     return deleteInventoryItem(body);
   }
 
-  throw new Error('Unknown inventory operation');
+  return inventoryErrorOutput('Unknown inventory operation: ' + op);
 }
 
 function addInventoryItem(body) {
-  const sheet = getSheet(SHEETS.INVENTORY);
-  const data = sheet.getDataRange().getValues();
-  const id = generateItemId(data, body.category);
-  sheet.appendRow([id, body.name, body.category, body.price || 0, 'TRUE']);
-  return { success: true, id: id };
+  try {
+    const sheet = getSheet(SHEETS.INVENTORY);
+    const data = sheet.getDataRange().getValues();
+    const id = generateItemId(data, body.category);
+    sheet.appendRow([id, body.name, body.category, body.price || 0, 'TRUE']);
+    return { success: true, id: id };
+  } catch (err) {
+    return inventoryErrorOutput(err.message);
+  }
 }
 
 function generateItemId(data, category) {
@@ -394,31 +426,39 @@ function generateItemId(data, category) {
 }
 
 function editInventoryItem(body) {
-  const sheet = getSheet(SHEETS.INVENTORY);
-  const data = sheet.getDataRange().getValues();
+  try {
+    const sheet = getSheet(SHEETS.INVENTORY);
+    const data = sheet.getDataRange().getValues();
 
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(body.id)) {
-      sheet.getRange(i + 1, 2, i + 1, 4).setValues([[body.name, body.category, Number(body.price) || 0]]);
-      return { success: true };
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(body.id)) {
+        sheet.getRange(i + 1, 2, i + 1, 4).setValues([[body.name, body.category, Number(body.price) || 0]]);
+        return { success: true };
+      }
     }
-  }
 
-  throw new Error('Item not found');
+    throw new Error('Item not found');
+  } catch (err) {
+    return inventoryErrorOutput(err.message);
+  }
 }
 
 function deleteInventoryItem(body) {
-  const sheet = getSheet(SHEETS.INVENTORY);
-  const data = sheet.getDataRange().getValues();
+  try {
+    const sheet = getSheet(SHEETS.INVENTORY);
+    const data = sheet.getDataRange().getValues();
 
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(body.id)) {
-      sheet.getRange(i + 1, 5).setValue('FALSE');
-      return { success: true };
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(body.id)) {
+        sheet.getRange(i + 1, 5).setValue('FALSE');
+        return { success: true };
+      }
     }
-  }
 
-  throw new Error('Item not found');
+    throw new Error('Item not found');
+  } catch (err) {
+    return inventoryErrorOutput(err.message);
+  }
 }
 
 // ── Sales ────────────────────────────────────────────────────────

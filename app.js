@@ -64,8 +64,9 @@ async function apiPost(body) {
       console.error('API POST non-JSON response:', body.action, text.slice(0, 200));
       throw new Error(`Invalid server response (${res.status})`);
     }
-    if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
-    if (data.error) throw new Error(data.error);
+    if (!res.ok) throw new Error(data.message || data.error || `Server error (${res.status})`);
+    if (data.status === 'error') throw new Error(data.message || data.error || 'Server error');
+    if (data.error) throw new Error(data.message || data.error);
     return data;
   } catch (err) {
     console.error('API POST failed:', body.action, body, err);
