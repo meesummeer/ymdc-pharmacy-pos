@@ -165,8 +165,18 @@ function dateInRange(dateStr, fromDMY, toDMY) {
   return true;
 }
 
-function formatTime(timeStr) {
-  return timeStr || '';
+function formatTimeDisplay(timeVal) {
+  if (timeVal == null || timeVal === '') return '—';
+  const s = String(timeVal);
+  if (s.includes('T') && s.includes('Z')) return '—';
+  return s;
+}
+
+function categoryClass(cat) {
+  const c = String(cat || '').toLowerCase();
+  if (c === 'medicine') return 'medicine';
+  if (c === 'snack') return 'snack';
+  return 'other';
 }
 
 function escapeHtml(str) {

@@ -195,6 +195,25 @@ function formatSheetTime(date) {
   return Utilities.formatDate(date, 'Asia/Karachi', 'hh:mm a');
 }
 
+function normalizeCellTime(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, 'Asia/Karachi', 'hh:mm a');
+  }
+  if (typeof value === 'number' && value >= 0 && value < 1) {
+    var ms = Math.round(value * 24 * 60 * 60 * 1000);
+    var d = new Date(ms);
+    return Utilities.formatDate(d, 'GMT', 'hh:mm a');
+  }
+  return String(value || '').trim();
+}
+
+function appendSaleRow(sheet, row) {
+  var rowNum = sheet.getLastRow() + 1;
+  sheet.getRange(rowNum, 1, 1, 8).setValues([row]);
+  sheet.getRange(rowNum, 2, 1, 2).setNumberFormat('@');
+  sheet.getRange(rowNum, 2).setValue(String(row[1]));
+  sheet.getRange(rowNum, 3).setValue(String(row[2]));
+}
 function normalizeCellDate(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
     return formatSheetDate(value);
@@ -400,8 +419,8 @@ function saveSale(body) {
 
   const invoiceNo = getNextInvoiceNo();
   const now = new Date();
-  const date = body.date ? String(body.date) : formatSheetDate(now);
-  const time = body.time ? String(body.time) : formatSheetTime(now);
+  const dateStr = body.date ? String(body.date) : Utilities.formatDate(now, 'Asia/Karachi', 'dd/MM/yyyy');
+  const timeStr = body.time ? String(body.time) : Utilities.formatDate(now, 'Asia/Karachi', 'hh:mm a');
   const patientName = body.patientName || '';
 
   const sheet = getSheet(SHEETS.SALES);
@@ -412,7 +431,7 @@ function saveSale(body) {
     const category = String(item.category || '');
     const qty = Number(item.qty) || 0;
     const price = Number(item.price) || 0;
-    sheet.appendRow([invoiceNo, date, time, patientName, name, category, qty, price]);
+    appendSaleRow(sheet, [invoiceNo, dateStr, timeStr, patientName, name, category, qty, price]);
   });
 
   const total = body.items.reduce(function(sum, item) {
@@ -424,8 +443,8 @@ function saveSale(body) {
   return {
     success: true,
     invoiceNo: invoiceNo,
-    date: date,
-    time: time,
+    date: dateStr,
+    time: timeStr,
     total: total,
   };
 }
@@ -494,7 +513,7 @@ function getHistoryData() {
       invoiceMap[invoiceNo] = {
         invoiceNo: invoiceNo,
         date: normalizeCellDate(row[1]),
-        time: String(row[2] || '').trim(),
+        time: normalizeCellTime(row[2]),
         patientName: String(row[3] || '').trim(),
         items: [],
         total: 0,

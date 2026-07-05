@@ -7,69 +7,80 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <div class="brand">
-        <h1>Yaseen Medical &amp; General Store</h1>
-        <span class="short">YMDC</span>
+  <div class="page-wrapper">
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <nav class="main-nav">
+          <a href="index.html" class="nav-link active" data-page="pos">POS</a>
+          <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+          <a href="history.html" class="nav-link" data-page="history">History</a>
+        </nav>
       </div>
-      <nav class="main-nav">
-        <a href="index.html" class="nav-link active" data-page="pos">POS</a>
-        <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
-        <a href="history.html" class="nav-link" data-page="history">History</a>
-      </nav>
-    </div>
-  </header>
+    </header>
 
-  <main class="main-content">
-    <h2 class="page-title">Point of Sale</h2>
+    <main class="main-content">
+      <h2 class="page-title">Point of Sale</h2>
 
-    <div class="card">
-      <div class="form-group">
-        <label for="search-input">Search Item</label>
-        <div class="search-wrapper">
-          <input type="text" id="search-input" placeholder="Type item name…" autocomplete="off">
-          <div id="search-dropdown" class="search-dropdown"></div>
+      <div class="card">
+        <div class="form-group">
+          <label for="search-input" class="form-label">Search Item</label>
+          <div class="search-wrapper input-search-wrap">
+            <span class="search-icon">⌕</span>
+            <input type="text" id="search-input" class="input-lg" placeholder="Type item name to search…" autocomplete="off">
+            <div id="search-dropdown" class="search-dropdown"></div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label for="patient-name" class="form-label">Patient Name <span style="color:var(--error)">*</span></label>
+          <input type="text" id="patient-name" class="input-lg" style="padding-left:16px" placeholder="Enter patient name" required>
+          <span class="field-error" id="patient-error">Patient name is required</span>
         </div>
       </div>
 
-      <div class="form-group">
-        <label for="patient-name">Patient Name <span style="color:var(--danger)">*</span></label>
-        <input type="text" id="patient-name" placeholder="Enter patient name" required>
-        <span class="field-error" id="patient-error">Patient name is required</span>
+      <div class="card" id="cart-section" style="display:none">
+        <h3 class="card-title">Cart</h3>
+        <div class="table-wrapper">
+          <table id="cart-table" class="cart-table">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Qty</th>
+                <th class="num">Unit Price</th>
+                <th class="num">Line Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cart-body"></tbody>
+          </table>
+        </div>
+        <div class="cart-total-bar">
+          <span>Grand Total</span>
+          <span class="total-amount" id="grand-total">PKR 0</span>
+        </div>
+        <div class="btn-group" style="margin-top:16px">
+          <button class="btn btn-primary" id="btn-save" disabled>Save Invoice</button>
+          <button class="btn btn-secondary" id="btn-clear-cart">Clear Cart</button>
+        </div>
       </div>
-    </div>
 
-    <div class="card" id="cart-section" style="display:none">
-      <h3 style="margin-bottom:0.75rem;color:var(--navy)">Cart</h3>
-      <div class="table-wrapper">
-        <table id="cart-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Qty</th>
-              <th class="num">Unit Price (PKR)</th>
-              <th class="num">Line Total</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="cart-body"></tbody>
-        </table>
+      <div id="empty-cart" class="card empty-state">
+        <div class="empty-state-icon">🛒</div>
+        <p>Search and select items above to start a sale.</p>
       </div>
-      <div class="cart-total-bar">
-        <span>Grand Total</span>
-        <span class="total-amount" id="grand-total">PKR 0</span>
-      </div>
-      <div class="btn-group" style="margin-top:1rem">
-        <button class="btn btn-gold" id="btn-save" disabled>Save Invoice</button>
-        <button class="btn btn-outline" id="btn-clear-cart">Clear Cart</button>
-      </div>
-    </div>
+    </main>
 
-    <div id="empty-cart" class="card empty-state">
-      Search and select items above to start a sale.
-    </div>
-  </main>
+    <footer class="site-footer">
+      Made by Meesum Mir · Yaseen Medical &amp; Diagnostic Centre · 2026
+    </footer>
+  </div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
@@ -104,9 +115,7 @@
     function getFilteredItems(query) {
       if (!query) return [];
       const q = query.toLowerCase();
-      return inventory.filter(item =>
-        item.name.toLowerCase().includes(q)
-      ).slice(0, 20);
+      return inventory.filter(item => item.name.toLowerCase().includes(q)).slice(0, 20);
     }
 
     function renderDropdown(items) {
@@ -118,7 +127,7 @@
         <div class="search-dropdown-item${i === highlightIndex ? ' highlighted' : ''}"
              data-id="${item.id}" data-index="${i}">
           <span>${escapeHtml(item.name)}</span>
-          <span class="cat-badge">${escapeHtml(item.category)}</span>
+          <span class="cat-badge ${categoryClass(item.category)}">${escapeHtml(item.category)}</span>
         </div>
       `).join('');
       searchDropdown.classList.add('open');
@@ -160,22 +169,23 @@
         total += lineTotal;
         return `
           <tr>
-            <td>${escapeHtml(item.name)}</td>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
             <td>
               <div class="qty-controls">
-                <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, -1)">−</button>
-                <input type="number" value="${item.qty}" min="1"
-                       oninput="setQty(${idx}, this.value)" class="qty-input">
-                <button class="btn btn-sm btn-outline btn-icon" onclick="changeQty(${idx}, 1)">+</button>
+                <button type="button" class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
+                <input type="number" value="${item.qty}" min="1" oninput="setQty(${idx}, this.value)" class="qty-input">
+                <button type="button" class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
               </div>
             </td>
             <td class="num">
-              <input type="number" class="price-input" value="${item.price}" min="0" step="1"
-                     oninput="setPrice(${idx}, this.value)">
+              <div class="price-cell">
+                <span class="price-prefix">PKR</span>
+                <input type="number" class="price-input" value="${item.price}" min="0" step="1" oninput="setPrice(${idx}, this.value)">
+              </div>
             </td>
-            <td class="num">${formatPKR(lineTotal)}</td>
+            <td class="num"><strong>${formatPKR(lineTotal)}</strong></td>
             <td>
-              <button class="btn btn-sm btn-danger btn-icon" onclick="removeItem(${idx})" title="Remove">×</button>
+              <button type="button" class="btn btn-danger btn-icon" onclick="removeItem(${idx})" title="Remove">×</button>
             </td>
           </tr>
         `;
@@ -190,7 +200,7 @@
     };
 
     window.setQty = function(idx, val) {
-      cart[idx].qty = Math.max(1, parseInt(val) || 1);
+      cart[idx].qty = Math.max(1, parseInt(val, 10) || 1);
       renderCart();
     };
 
@@ -206,14 +216,12 @@
 
     searchInput.addEventListener('input', () => {
       highlightIndex = -1;
-      const items = getFilteredItems(searchInput.value.trim());
-      renderDropdown(items);
+      renderDropdown(getFilteredItems(searchInput.value.trim()));
     });
 
     searchInput.addEventListener('keydown', (e) => {
       const items = getFilteredItems(searchInput.value.trim());
       if (!items.length) return;
-
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         highlightIndex = Math.min(highlightIndex + 1, items.length - 1);
@@ -224,8 +232,7 @@
         renderDropdown(items);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const idx = highlightIndex >= 0 ? highlightIndex : 0;
-        addToCart(items[idx]);
+        addToCart(items[highlightIndex >= 0 ? highlightIndex : 0]);
       } else if (e.key === 'Escape') {
         searchDropdown.classList.remove('open');
       }
@@ -239,9 +246,7 @@
     });
 
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.search-wrapper')) {
-        searchDropdown.classList.remove('open');
-      }
+      if (!e.target.closest('.search-wrapper')) searchDropdown.classList.remove('open');
     });
 
     btnClearCart.addEventListener('click', () => {
@@ -258,7 +263,6 @@
 
     btnSave.addEventListener('click', async () => {
       if (!cart.length) return;
-
       const patientName = patientInput.value.trim();
       if (!patientName) {
         patientInput.classList.add('input-error');
@@ -270,14 +274,13 @@
 
       btnSave.disabled = true;
       btnSave.textContent = 'Saving…';
-
       syncCartFromDOM(cartBody, cart);
       const saleData = buildSaleData(cart, patientName);
       console.log('SENDING:', JSON.stringify(saleData));
 
       try {
         const result = await apiPost(saleData);
-        showToast('Invoice saved successfully — ' + result.invoiceNo, 'success');
+        showToast('Invoice saved — ' + result.invoiceNo, 'success');
         cart = [];
         patientInput.value = '';
         patientInput.classList.remove('input-error');

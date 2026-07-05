@@ -7,47 +7,55 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <div class="brand">
-        <h1>Yaseen Medical &amp; General Store</h1>
-        <span class="short">YMDC</span>
+  <div class="page-wrapper">
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <nav class="main-nav">
+          <a href="index.html" class="nav-link" data-page="pos">POS</a>
+          <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+          <a href="history.html" class="nav-link active" data-page="history">History</a>
+        </nav>
       </div>
-      <nav class="main-nav">
-        <a href="index.html" class="nav-link" data-page="pos">POS</a>
-        <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
-        <a href="history.html" class="nav-link active" data-page="history">History</a>
-      </nav>
-    </div>
-  </header>
+    </header>
 
-  <main class="main-content">
-    <h2 class="page-title">Invoice History</h2>
+    <main class="main-content">
+      <h2 class="page-title">Invoice History</h2>
 
-    <div class="filter-bar card" style="padding:1rem">
-      <div class="form-group">
-        <label for="date-from">From (DD/MM/YYYY)</label>
-        <input type="text" id="date-from" placeholder="DD/MM/YYYY" maxlength="10">
+      <div class="filter-bar card">
+        <div class="form-group">
+          <label for="date-from" class="form-label">From</label>
+          <input type="text" id="date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label for="date-to" class="form-label">To</label>
+          <input type="text" id="date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-filter">Filter</button>
+        <button class="btn btn-gold btn-sm" id="btn-clear-filter">This Month</button>
       </div>
-      <div class="form-group">
-        <label for="date-to">To (DD/MM/YYYY)</label>
-        <input type="text" id="date-to" placeholder="DD/MM/YYYY" maxlength="10">
-      </div>
-      <button class="btn btn-primary btn-sm" id="btn-filter" style="margin-bottom:0">Filter</button>
-      <button class="btn btn-outline btn-sm" id="btn-clear-filter" style="margin-bottom:0">This Month</button>
-    </div>
 
-    <div id="history-container">
-      <div class="card loading">Loading history</div>
-    </div>
-  </main>
+      <div id="history-container">
+        <div class="card loading">Loading history</div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Made by Meesum Mir · Yaseen Medical &amp; Diagnostic Centre · 2026
+    </footer>
+  </div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
     let allInvoices = [];
     let expandedInvoice = null;
-
     const historyContainer = document.getElementById('history-container');
 
     setActiveNav('history');
@@ -59,9 +67,7 @@
     }
 
     function normalizeInvoices(data) {
-      if (Array.isArray(data.invoices) && data.invoices.length) {
-        return data.invoices;
-      }
+      if (Array.isArray(data.invoices) && data.invoices.length) return data.invoices;
       if (Array.isArray(data.days)) {
         const fromDays = data.days.flatMap(day => day.invoices || []);
         if (fromDays.length) return fromDays;
@@ -78,62 +84,51 @@
         console.log('FIRST INVOICE:', data.invoices?.[0]);
 
         allInvoices = normalizeInvoices(data);
-        console.log('NORMALIZED INVOICES:', allInvoices.length, allInvoices[0]);
         renderHistory();
       } catch (err) {
-        historyContainer.innerHTML = `<div class="card empty-state">Failed to load: ${escapeHtml(err.message)}</div>`;
+        historyContainer.innerHTML = `<div class="card empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
         showToast('Failed to load history: ' + err.message, 'error');
       }
-    }
-
-    function getDateFilter() {
-      return {
-        from: document.getElementById('date-from').value.trim(),
-        to: document.getElementById('date-to').value.trim(),
-      };
     }
 
     function renderInvoiceCard(inv) {
       const isExpanded = expandedInvoice === inv.invoiceNo;
       const items = inv.items || [];
+      const timeDisplay = formatTimeDisplay(inv.time);
 
       return `
         <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoiceNo)}">
-          <div class="invoice-card-header history-row">
-            <div class="invoice-card-main">
+          <div class="invoice-card-header">
+            <div class="invoice-card-top">
               <span class="invoice-card-no">${escapeHtml(inv.invoiceNo)} ${isExpanded ? '▾' : '▸'}</span>
-              <span class="invoice-card-meta">
-                <strong>Date:</strong> ${formatDate(inv.date)} &nbsp;
-                <strong>Time:</strong> ${escapeHtml(inv.time || '—')} &nbsp;
-                <strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}
-              </span>
+              <span class="invoice-card-field"><strong>Date:</strong> ${formatDate(inv.date)}</span>
+              <span class="invoice-card-field"><strong>Time:</strong> ${escapeHtml(timeDisplay)}</span>
+              <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}</span>
             </div>
             <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
           </div>
           ${isExpanded ? `
             <div class="invoice-card-body">
-              <div class="table-wrapper">
-                <table>
-                  <thead>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th class="num">Qty</th>
+                    <th class="num">Unit Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items.map(item => `
                     <tr>
-                      <th>Item Name</th>
-                      <th>Category</th>
-                      <th class="num">Qty</th>
-                      <th class="num">Unit Price</th>
+                      <td>${escapeHtml(item.name || item.itemName || '—')}</td>
+                      <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category || '—')}</span></td>
+                      <td class="num">${item.qty || 0}</td>
+                      <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice || 0)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    ${items.map(item => `
-                      <tr>
-                        <td>${escapeHtml(item.name || item.itemName || '—')}</td>
-                        <td>${escapeHtml(item.category || '—')}</td>
-                        <td class="num">${item.qty || 0}</td>
-                        <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice || 0)}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
+                  `).join('')}
+                </tbody>
+              </table>
             </div>
           ` : ''}
         </div>
@@ -141,11 +136,17 @@
     }
 
     function renderHistory() {
-      const { from, to } = getDateFilter();
+      const from = document.getElementById('date-from').value.trim();
+      const to = document.getElementById('date-to').value.trim();
       const filtered = allInvoices.filter(inv => dateInRange(inv.date, from, to));
 
       if (!filtered.length) {
-        historyContainer.innerHTML = `<div class="card empty-state">No invoices found for this period.<br><small>Loaded ${allInvoices.length} total from server. Filter: ${escapeHtml(from)} – ${escapeHtml(to)}</small></div>`;
+        historyContainer.innerHTML = `
+          <div class="card empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>No invoices found</p>
+            <small>${allInvoices.length} total loaded · Filter: ${escapeHtml(from)} – ${escapeHtml(to)}</small>
+          </div>`;
         return;
       }
 
@@ -156,7 +157,7 @@
           const diff = dmyToNumber(db) - dmyToNumber(da);
           if (diff !== 0) return diff;
         }
-        return String(b.time || '').localeCompare(String(a.time || ''));
+        return formatTimeDisplay(b.time).localeCompare(formatTimeDisplay(a.time));
       });
 
       historyContainer.innerHTML = filtered.map(inv => renderInvoiceCard(inv)).join('');
