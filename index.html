@@ -31,9 +31,8 @@
       <div class="card">
         <div class="form-group">
           <label for="search-input" class="form-label">Search Item</label>
-          <div class="search-wrapper input-search-wrap">
-            <span class="search-icon">⌕</span>
-            <input type="text" id="search-input" class="input-lg" placeholder="Type item name to search…" autocomplete="off">
+          <div class="search-wrapper">
+            <input type="text" id="search-input" class="input-lg input-search" placeholder="Search items…" autocomplete="off">
             <div id="search-dropdown" class="search-dropdown"></div>
           </div>
         </div>
@@ -152,6 +151,19 @@
       renderCart();
     }
 
+    function updateGrandTotal() {
+      const total = cart.reduce((sum, item) => sum + item.qty * (Number(item.price) || 0), 0);
+      grandTotal.textContent = formatPKR(total);
+    }
+
+    function updateLineTotal(idx) {
+      const row = cartBody.querySelector(`tr[data-idx="${idx}"]`);
+      if (!row) return;
+      const lineTotal = cart[idx].qty * (Number(cart[idx].price) || 0);
+      const cell = row.querySelector('.line-total-cell');
+      if (cell) cell.textContent = formatPKR(lineTotal);
+    }
+
     function renderCart() {
       if (!cart.length) {
         cartSection.style.display = 'none';
@@ -163,56 +175,75 @@
       emptyCart.style.display = 'none';
       btnSave.disabled = false;
 
-      let total = 0;
-      cartBody.innerHTML = cart.map((item, idx) => {
-        const lineTotal = item.qty * (Number(item.price) || 0);
-        total += lineTotal;
-        return `
-          <tr>
-            <td><strong>${escapeHtml(item.name)}</strong></td>
-            <td>
-              <div class="qty-controls">
-                <button type="button" class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
-                <input type="number" value="${item.qty}" min="1" oninput="setQty(${idx}, this.value)" class="qty-input">
-                <button type="button" class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
-              </div>
-            </td>
-            <td class="num">
-              <div class="price-cell">
-                <span class="price-prefix">PKR</span>
-                <input type="number" class="price-input" value="${item.price}" min="0" step="1" oninput="setPrice(${idx}, this.value)">
-              </div>
-            </td>
-            <td class="num"><strong>${formatPKR(lineTotal)}</strong></td>
-            <td>
-              <button type="button" class="btn btn-danger btn-icon" onclick="removeItem(${idx})" title="Remove">×</button>
-            </td>
-          </tr>
-        `;
-      }).join('');
+      cartBody.innerHTML = cart.map((item, idx) => `
+        <tr data-idx="${idx}">
+          <td><strong>${escapeHtml(item.name)}</strong></td>
+          <td>
+            <div class="qty-controls">
+              <button type="button" class="qty-btn" data-action="qty-minus" data-idx="${idx}">−</button>
+              <input type="number" value="${item.qty}" min="1" class="qty-input" data-idx="${idx}">
+              <button type="button" class="qty-btn" data-action="qty-plus" data-idx="${idx}">+</button>
+            </div>
+          </td>
+          <td class="num">
+            <div class="price-cell">
+              <span class="price-prefix">PKR</span>
+              <input type="number" class="price-input" value="${item.price}" min="0" step="1" data-idx="${idx}">
+            </div>
+          </td>
+          <td class="num line-total-cell"><strong>${formatPKR(item.qty * (Number(item.price) || 0))}</strong></td>
+          <td>
+            <button type="button" class="btn btn-danger btn-icon" data-action="remove" data-idx="${idx}" title="Remove">×</button>
+          </td>
+        </tr>
+      `).join('');
 
-      grandTotal.textContent = formatPKR(total);
+      updateGrandTotal();
     }
 
-    window.changeQty = function(idx, delta) {
-      cart[idx].qty = Math.max(1, cart[idx].qty + delta);
-      renderCart();
-    };
+    cartBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      if (btn.dataset.action === 'qty-minus') {
+        cart[idx].qty = Math.max(1, cart[idx].qty - 1);
+        const input = cartBody.querySelector(`.qty-input[data-idx="${idx}"]`);
+        if (input) input.value = cart[idx].qty;
+        updateLineTotal(idx);
+        updateGrandTotal();
+      } else if (btn.dataset.action === 'qty-plus') {
+        cart[idx].qty += 1;
+        const input = cartBody.querySelector(`.qty-input[data-idx="${idx}"]`);
+        if (input) input.value = cart[idx].qty;
+        updateLineTotal(idx);
+        updateGrandTotal();
+      } else if (btn.dataset.action === 'remove') {
+        cart.splice(idx, 1);
+        renderCart();
+      }
+    });
 
-    window.setQty = function(idx, val) {
-      cart[idx].qty = Math.max(1, parseInt(val, 10) || 1);
-      renderCart();
-    };
+    cartBody.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      if (Number.isNaN(idx) || !cart[idx]) return;
+      if (e.target.classList.contains('price-input')) {
+        cart[idx].price = Math.max(0, parseFloat(e.target.value) || 0);
+        updateLineTotal(idx);
+        updateGrandTotal();
+      } else if (e.target.classList.contains('qty-input')) {
+        cart[idx].qty = Math.max(1, parseInt(e.target.value, 10) || 1);
+        updateLineTotal(idx);
+        updateGrandTotal();
+      }
+    });
 
-    window.setPrice = function(idx, val) {
-      cart[idx].price = Math.max(0, parseFloat(val) || 0);
-      renderCart();
-    };
-
-    window.removeItem = function(idx) {
-      cart.splice(idx, 1);
-      renderCart();
-    };
+    cartBody.addEventListener('blur', (e) => {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      if (Number.isNaN(idx) || !cart[idx]) return;
+      if (e.target.classList.contains('qty-input')) {
+        e.target.value = cart[idx].qty;
+      }
+    }, true);
 
     searchInput.addEventListener('input', () => {
       highlightIndex = -1;

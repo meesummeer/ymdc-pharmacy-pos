@@ -152,6 +152,48 @@ function getCurrentMonthRange() {
   return { from: formatDateFromParts(first), to: formatDateFromParts(last) };
 }
 
+function getLastMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  return { from: formatDateFromParts(first), to: formatDateFromParts(last) };
+}
+
+function getTodayRange() {
+  const d = formatDateFromParts(new Date());
+  return { from: d, to: d };
+}
+
+function getYesterdayRange() {
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  const d = formatDateFromParts(y);
+  return { from: d, to: d };
+}
+
+function getThisWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: formatDateFromParts(monday), to: formatDateFromParts(sunday) };
+}
+
+function getDateRangePreset(preset) {
+  switch (preset) {
+    case 'today': return getTodayRange();
+    case 'yesterday': return getYesterdayRange();
+    case 'this-week': return getThisWeekRange();
+    case 'this-month': return getCurrentMonthRange();
+    case 'last-month': return getLastMonthRange();
+    default: return getCurrentMonthRange();
+  }
+}
+
+const ALL_CATEGORIES = ['Medicine', 'Snack', 'Other'];
+
 function dateInRange(dateStr, fromDMY, toDMY) {
   if (!fromDMY && !toDMY) return true;
   const normalized = formatDate(dateStr);

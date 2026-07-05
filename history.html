@@ -29,16 +29,13 @@
       <h2 class="page-title">Invoice History</h2>
 
       <div class="filter-bar card">
-        <div class="form-group">
-          <label for="date-from" class="form-label">From</label>
-          <input type="text" id="date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        <div id="filter-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
+          Loading…
         </div>
-        <div class="form-group">
-          <label for="date-to" class="form-label">To</label>
-          <input type="text" id="date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        <div class="filter-bar-actions">
+          <button class="btn btn-primary btn-sm" id="btn-open-filter">Filter</button>
+          <button class="btn btn-gold btn-sm" id="btn-this-month">This Month</button>
         </div>
-        <button class="btn btn-primary btn-sm" id="btn-filter">Filter</button>
-        <button class="btn btn-gold btn-sm" id="btn-clear-filter">This Month</button>
       </div>
 
       <div id="history-container">
@@ -51,19 +48,85 @@
     </footer>
   </div>
 
+  <!-- Filter Modal -->
+  <div class="modal-overlay filter-modal" id="filter-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Filter Invoices</h3>
+        <button class="modal-close" id="filter-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="filter-section-title">Date Range</div>
+        <div class="form-group">
+          <label for="modal-date-from" class="form-label">From</label>
+          <input type="text" id="modal-date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label for="modal-date-to" class="form-label">To</label>
+          <input type="text" id="modal-date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="preset-pills" id="preset-pills">
+          <button type="button" class="preset-pill" data-preset="today">Today</button>
+          <button type="button" class="preset-pill" data-preset="yesterday">Yesterday</button>
+          <button type="button" class="preset-pill" data-preset="this-week">This Week</button>
+          <button type="button" class="preset-pill" data-preset="this-month">This Month</button>
+          <button type="button" class="preset-pill" data-preset="last-month">Last Month</button>
+        </div>
+
+        <div class="filter-section-title">Category</div>
+        <div class="checkbox-group" id="category-checkboxes">
+          <label class="checkbox-label">
+            <input type="checkbox" id="cat-all" checked> All
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" class="cat-check" value="Medicine" checked> Medicine
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" class="cat-check" value="Snack" checked> Snack
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" class="cat-check" value="Other" checked> Other
+          </label>
+        </div>
+
+        <div class="form-group" style="margin-top:20px;margin-bottom:0">
+          <label for="modal-item-search" class="form-label">Item Name (optional)</label>
+          <input type="text" id="modal-item-search" placeholder="Filter by item name">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-spread">
+          <button type="button" class="btn-text" id="filter-cancel">Cancel</button>
+          <div class="modal-footer-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="filter-reset">Reset</button>
+            <button type="button" class="btn btn-primary btn-sm" id="filter-apply">Apply Filters</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
     let allInvoices = [];
     let expandedInvoice = null;
+    let activeFilters = defaultFilters();
+
     const historyContainer = document.getElementById('history-container');
+    const filterModal = document.getElementById('filter-modal');
+    const filterSummary = document.getElementById('filter-summary');
 
     setActiveNav('history');
 
-    function setCurrentMonthFilter() {
+    function defaultFilters() {
       const range = getCurrentMonthRange();
-      document.getElementById('date-from').value = range.from;
-      document.getElementById('date-to').value = range.to;
+      return {
+        from: range.from,
+        to: range.to,
+        categories: [...ALL_CATEGORIES],
+        itemSearch: '',
+      };
     }
 
     function normalizeInvoices(data) {
@@ -75,14 +138,78 @@
       return [];
     }
 
+    function getSelectedCategories() {
+      const allChecked = document.getElementById('cat-all').checked;
+      if (allChecked) return [...ALL_CATEGORIES];
+      return Array.from(document.querySelectorAll('.cat-check:checked')).map(cb => cb.value);
+    }
+
+    function setCategoryCheckboxes(categories) {
+      const all = categories.length === ALL_CATEGORIES.length;
+      document.getElementById('cat-all').checked = all;
+      document.querySelectorAll('.cat-check').forEach(cb => {
+        cb.checked = categories.includes(cb.value);
+      });
+    }
+
+    function syncModalFromActive() {
+      document.getElementById('modal-date-from').value = activeFilters.from;
+      document.getElementById('modal-date-to').value = activeFilters.to;
+      document.getElementById('modal-item-search').value = activeFilters.itemSearch;
+      setCategoryCheckboxes(activeFilters.categories);
+      document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+    }
+
+    function openFilterModal() {
+      syncModalFromActive();
+      filterModal.classList.add('open');
+    }
+
+    function closeFilterModal() {
+      filterModal.classList.remove('open');
+    }
+
+    function applyInvoiceItemFilters(invoice) {
+      let items = (invoice.items || []).slice();
+      const cats = activeFilters.categories;
+
+      if (cats.length && cats.length < ALL_CATEGORIES.length) {
+        items = items.filter(item => cats.includes(item.category));
+      }
+
+      if (activeFilters.itemSearch) {
+        const q = activeFilters.itemSearch.toLowerCase();
+        items = items.filter(item => {
+          const name = (item.name || item.itemName || '').toLowerCase();
+          return name.includes(q);
+        });
+      }
+
+      if (!items.length) return null;
+
+      const total = items.reduce((sum, item) => {
+        const price = item.price != null ? item.price : item.unitPrice || 0;
+        return sum + (item.qty || 0) * price;
+      }, 0);
+
+      return { ...invoice, items, total };
+    }
+
+    function getFilteredInvoices() {
+      return allInvoices
+        .filter(inv => dateInRange(inv.date, activeFilters.from, activeFilters.to))
+        .map(inv => applyInvoiceItemFilters(inv))
+        .filter(Boolean);
+    }
+
+    function updateFilterSummary(count, total) {
+      filterSummary.innerHTML = `Showing <strong>${count}</strong> invoice${count !== 1 ? 's' : ''} · <strong>${formatPKR(total)}</strong> total`;
+    }
+
     async function loadHistory() {
       historyContainer.innerHTML = '<div class="card loading">Loading history</div>';
       try {
         const data = await apiGet('history');
-        console.log('RAW RESPONSE:', JSON.stringify(data));
-        console.log('INVOICES ARRAY:', data.invoices);
-        console.log('FIRST INVOICE:', data.invoices?.[0]);
-
         allInvoices = normalizeInvoices(data);
         renderHistory();
       } catch (err) {
@@ -136,16 +263,16 @@
     }
 
     function renderHistory() {
-      const from = document.getElementById('date-from').value.trim();
-      const to = document.getElementById('date-to').value.trim();
-      const filtered = allInvoices.filter(inv => dateInRange(inv.date, from, to));
+      const filtered = getFilteredInvoices();
+      const totalRevenue = filtered.reduce((sum, inv) => sum + (inv.total || 0), 0);
+      updateFilterSummary(filtered.length, totalRevenue);
 
       if (!filtered.length) {
         historyContainer.innerHTML = `
           <div class="card empty-state">
             <div class="empty-state-icon">📋</div>
             <p>No invoices found</p>
-            <small>${allInvoices.length} total loaded · Filter: ${escapeHtml(from)} – ${escapeHtml(to)}</small>
+            <small>${allInvoices.length} total loaded · ${escapeHtml(activeFilters.from)} – ${escapeHtml(activeFilters.to)}</small>
           </div>`;
         return;
       }
@@ -163,6 +290,12 @@
       historyContainer.innerHTML = filtered.map(inv => renderInvoiceCard(inv)).join('');
     }
 
+    function applyThisMonth() {
+      activeFilters = defaultFilters();
+      expandedInvoice = null;
+      renderHistory();
+    }
+
     historyContainer.addEventListener('click', (e) => {
       const card = e.target.closest('.invoice-card[data-invoice]');
       if (!card) return;
@@ -171,18 +304,52 @@
       renderHistory();
     });
 
-    document.getElementById('btn-filter').addEventListener('click', () => {
+    document.getElementById('btn-open-filter').addEventListener('click', openFilterModal);
+    document.getElementById('btn-this-month').addEventListener('click', applyThisMonth);
+    document.getElementById('filter-modal-close').addEventListener('click', closeFilterModal);
+    document.getElementById('filter-cancel').addEventListener('click', closeFilterModal);
+    filterModal.addEventListener('click', (e) => { if (e.target === filterModal) closeFilterModal(); });
+
+    document.getElementById('filter-apply').addEventListener('click', () => {
+      activeFilters = {
+        from: document.getElementById('modal-date-from').value.trim(),
+        to: document.getElementById('modal-date-to').value.trim(),
+        categories: getSelectedCategories(),
+        itemSearch: document.getElementById('modal-item-search').value.trim(),
+      };
       expandedInvoice = null;
+      closeFilterModal();
       renderHistory();
     });
 
-    document.getElementById('btn-clear-filter').addEventListener('click', () => {
-      setCurrentMonthFilter();
-      expandedInvoice = null;
-      renderHistory();
+    document.getElementById('filter-reset').addEventListener('click', () => {
+      activeFilters = defaultFilters();
+      syncModalFromActive();
     });
 
-    setCurrentMonthFilter();
+    document.getElementById('preset-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      const range = getDateRangePreset(pill.dataset.preset);
+      document.getElementById('modal-date-from').value = range.from;
+      document.getElementById('modal-date-to').value = range.to;
+      document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    document.getElementById('cat-all').addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      document.querySelectorAll('.cat-check').forEach(cb => { cb.checked = checked; });
+    });
+
+    document.querySelectorAll('.cat-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const allChecked = Array.from(document.querySelectorAll('.cat-check')).every(c => c.checked);
+        document.getElementById('cat-all').checked = allChecked;
+      });
+    });
+
+    activeFilters = defaultFilters();
     loadHistory();
   </script>
 </body>

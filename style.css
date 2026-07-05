@@ -227,23 +227,23 @@ input:focus, select:focus, textarea:focus {
 
 .input-lg {
   height: 48px;
-  padding: 0 16px 0 44px;
+  padding: 0 16px;
   font-size: 15px;
   border-radius: 10px;
 }
 
-.input-search-wrap {
-  position: relative;
+.input-search {
+  padding-left: 16px;
+  font-family: inherit;
 }
 
-.input-search-wrap .search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-secondary);
-  pointer-events: none;
-  font-size: 16px;
+.input-search::placeholder {
+  color: #9CA3AF;
+  opacity: 1;
+}
+
+.input-search-wrap {
+  position: relative;
 }
 
 .search-wrapper { position: relative; }
@@ -595,12 +595,123 @@ td.num, th.num { text-align: right; }
 /* ── History ──────────────────────────────────────────────────── */
 .filter-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  align-items: flex-end;
   flex-wrap: wrap;
 }
 
-.filter-bar .form-group { margin-bottom: 0; flex: 1; min-width: 140px; }
+.filter-bar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-summary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.filter-summary strong {
+  color: var(--navy);
+}
+
+.filter-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.preset-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.preset-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-pill:hover,
+.preset-pill.active {
+  background: var(--hover-bg);
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-body);
+  cursor: pointer;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+
+.modal-footer-spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  transition: color 0.15s ease;
+}
+
+.btn-text:hover { color: var(--navy); }
+
+.modal-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-modal .modal { max-width: 520px; }
 
 .invoice-card {
   background: var(--card);
