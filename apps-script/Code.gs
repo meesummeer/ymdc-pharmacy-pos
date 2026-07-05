@@ -5,7 +5,7 @@
 
 const SPREADSHEET_NAME = 'YMDC Pharmacy POS';
 // Paste from Google Sheet URL: https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit
-const SHEET_ID = 'YOUR_SPREADSHEET_ID';
+const SHEET_ID = '1LlF7Lfq2-uO3iaSmizwh3Q9m8PAZwVN8bFvOwVe0qWs';
 const SHEETS = {
   INVENTORY: 'Inventory',
   SALES: 'Sales',
