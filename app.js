@@ -27,35 +27,70 @@ function showToast(message, type = 'info') {
 // ── API helpers ──────────────────────────────────────────────────
 async function apiGet(action) {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Server error (${res.status})`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('API GET non-JSON response:', action, text.slice(0, 200));
+      throw new Error(`Invalid server response (${res.status})`);
+    }
+    if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (err) {
+    console.error('API GET failed:', action, err);
+    if (err.message === 'Failed to fetch') {
+      throw new Error('Network error — check connection and Apps Script URL in config.js');
+    }
+    throw err;
+  }
 }
 
 async function apiPost(body) {
-  // text/plain avoids CORS preflight with Google Apps Script Web Apps
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Server error (${res.status})`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('API POST non-JSON response:', body.action, text.slice(0, 200));
+      throw new Error(`Invalid server response (${res.status})`);
+    }
+    if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (err) {
+    console.error('API POST failed:', body.action, body, err);
+    if (err.message === 'Failed to fetch') {
+      throw new Error('Network error — check connection and Apps Script URL in config.js');
+    }
+    throw err;
+  }
 }
 
 // ── Sale payload builder ─────────────────────────────────────────
 function captureTimestamp() {
   const now = new Date();
-  const date = formatDateFromParts(now);
-  const hours = now.getHours();
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const h12 = hours % 12 || 12;
-  const time = `${h12}:${minutes} ${ampm}`;
+  const date = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(now);
+  const time = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Karachi',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(now);
   return { date, time };
 }
 
@@ -209,8 +244,30 @@ function dateInRange(dateStr, fromDMY, toDMY) {
 
 function formatTimeDisplay(timeVal) {
   if (timeVal == null || timeVal === '') return '—';
-  const s = String(timeVal);
-  if (s.includes('T') && s.includes('Z')) return '—';
+  const s = String(timeVal).trim();
+  if (!s) return '—';
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Karachi',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).format(d);
+    }
+  }
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const num = parseFloat(s);
+    if (num >= 0 && num < 1) {
+      const totalMins = Math.round(num * 24 * 60);
+      const h24 = Math.floor(totalMins / 60);
+      const mins = String(totalMins % 60).padStart(2, '0');
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = h24 % 12 || 12;
+      return `${h12}:${mins} ${ampm}`;
+    }
+  }
   return s;
 }
 

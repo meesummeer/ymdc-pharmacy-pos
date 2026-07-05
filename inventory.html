@@ -201,14 +201,16 @@
         id: editId.value || undefined,
         name,
         category: itemCategory.value,
-        price: parseFloat(itemPrice.value) || 0,
+        price: Number(parseFloat(itemPrice.value)) || 0,
       };
       try {
+        console.log('Saving inventory item:', payload);
         await apiPost(payload);
         showToast(editId.value ? 'Item updated' : 'Item added', 'success');
         closeModal();
         await loadInventory();
       } catch (err) {
+        console.error('Inventory save failed:', err);
         showToast('Save failed: ' + err.message, 'error');
       }
     });
