@@ -175,7 +175,7 @@ If you change `Code.gs`:
 - **Responsive:** Works on phone, tablet, and laptop
 - **Print:** Invoice print view hides all navigation and UI chrome
 
----
+----
 
 ## License
 
