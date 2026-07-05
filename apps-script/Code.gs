@@ -4,6 +4,8 @@
  */
 
 const SPREADSHEET_NAME = 'YMDC Pharmacy POS';
+// Paste from Google Sheet URL: https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit
+const SHEET_ID = 'YOUR_SPREADSHEET_ID';
 const SHEETS = {
   INVENTORY: 'Inventory',
   SALES: 'Sales',
@@ -140,21 +142,13 @@ function formatSheetHeaders() {
 // ── Spreadsheet access ───────────────────────────────────────────
 
 function getSpreadsheet() {
-  const files = DriveApp.getFilesByName(SPREADSHEET_NAME);
-  if (files.hasNext()) {
-    return SpreadsheetApp.open(files.next());
-  }
-  const ss = SpreadsheetApp.create(SPREADSHEET_NAME);
-  initializeSheets(ss);
-  return ss;
+  return SpreadsheetApp.openById(SHEET_ID);
 }
 
 function getSheet(name) {
-  const ss = getSpreadsheet();
-  let sheet = ss.getSheetByName(name);
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(name);
   if (!sheet) {
-    initializeSheets(ss);
-    sheet = ss.getSheetByName(name);
+    throw new Error('Sheet not found: ' + name + '. Run runSetup() from the Apps Script editor.');
   }
   return sheet;
 }
