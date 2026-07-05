@@ -164,7 +164,7 @@ function initializeSheets(ss) {
   const configSheet = ss.getSheetByName(SHEETS.CONFIG);
   const configData = configSheet.getDataRange().getValues();
   if (configData.length <= 1) {
-    configSheet.getRange(2, 1, 2, 2).setValues([['lastInvoiceNumber', '0']]);
+    configSheet.getRange(2, 1, 1, 2).setValues([['lastInvoiceNumber', '0']]);
   }
 
   const invSheet = ss.getSheetByName(SHEETS.INVENTORY);
@@ -240,8 +240,8 @@ function normalizeCellTime(value) {
 
 function appendSaleRow(sheet, row) {
   var rowNum = sheet.getLastRow() + 1;
-  sheet.getRange(rowNum, 1, rowNum, 8).setValues([row]);
-  sheet.getRange(rowNum, 2, rowNum, 3).setNumberFormat('@');
+  sheet.getRange(rowNum, 1, 1, 8).setValues([row]);
+  sheet.getRange(rowNum, 2, 1, 2).setNumberFormat('@');
   sheet.getRange(rowNum, 2).setValue(String(row[1]));
   sheet.getRange(rowNum, 3).setValue(String(row[2]));
 }
@@ -316,7 +316,7 @@ function seedInventory(sheet) {
   });
 
   if (rows.length) {
-    sheet.getRange(2, 1, 1 + rows.length, 5).setValues(rows);
+    sheet.getRange(2, 1, rows.length, 5).setValues(rows);
   }
 }
 
@@ -426,7 +426,7 @@ function editInventoryItem(body) {
 
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(body.id)) {
-        sheet.getRange(i + 1, 2, i + 1, 4).setValues([[body.name, body.category, Number(body.price) || 0]]);
+        sheet.getRange(i + 1, 2, 1, 3).setValues([[body.name, body.category, Number(body.price) || 0]]);
         return { success: true };
       }
     }
@@ -534,7 +534,7 @@ function updateDailySummary() {
     if (idx > 0) row++;
     const stats = dayStats[d];
     const invoiceCount = Object.keys(stats.invoices).length;
-    summarySheet.getRange(row, 1, row, 3).setValues([[d, invoiceCount, stats.revenue]]);
+    summarySheet.getRange(row, 1, 1, 3).setValues([[d, invoiceCount, stats.revenue]]);
     row++;
   });
 }
