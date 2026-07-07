@@ -455,6 +455,38 @@ function deleteInventoryItem(body) {
   }
 }
 
+function bulkAddInventoryItems() {
+  const newMedicines = [
+    'Carveda 6.25', 'Sekt 100', 'Sekt 50', 'Saniplast', 'Indrop D Inj', 'Indrop D Cap',
+    'Eziday 50', 'Eziday 25', 'Tenormin 50', 'Tenormin 25', 'Concor 5', 'Concor 2.5',
+    'Diamicron', 'Diamicron MR 30', 'Diamicron MR 60', 'Getryl 1mg', 'Getryl 2mg',
+    'Getryl 3mg', 'Getryl 4mg', 'Daonil', 'Terbisil CR', 'Danzen', 'Danzen DS',
+    'Laxoberon Tab', 'Vidaylin Syp', 'No-Spa Inj', 'Sustac 2.6', 'Sustac 6.4mg',
+    'No-Spa Tab New', 'No Spa Forte 30', 'Zetro Syp', 'Fibrocol Sch', 'Ponstan Fort',
+    'Voren 50 Tab', 'Polyfax Skin', 'Polyfax Eye', 'Cebosh Syp 30ml', 'Lorin NSA Tab L',
+    'Cebosh DS Syp', 'Flagyl Syp', 'Entamizole Tab', 'Entamizole DS', 'Entamizole Syp',
+    'Osmolor ORS', 'Esso 40 Cap', 'Esso 20', 'Novipraz 10', 'Novipraz 20', 'Ezium 20',
+    'Ezium 40', 'Carveda 3.125', 'Cremafin', 'Duphalac Syp(S)', 'Enterogermina L',
+    'Domel Tab', 'Atem L', 'Clenil-A L', 'Zyrtec Tab', 'T-Day Syp', 'Zestril 10',
+    'Zestril 5', 'Angised', 'Aldactone 100 Tab', 'Tamsolin 0.4', 'Solifen 5',
+    'Solifin 10', 'Olanzia 10mg Tab', 'Olanzia 5mg', 'Kempro', 'Citanew 10 Tab',
+    'Brufen 200', 'Risek Inj', 'Fusiderm 15gr', 'Fusiderm H Cr', 'Kestine 10',
+    'Zopent 40mg', 'C A C Plus', 'Chewcal',
+  ];
+
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Inventory');
+  if (!sheet) {
+    throw new Error('Inventory sheet not found');
+  }
+
+  newMedicines.forEach(function(name) {
+    const id = Utilities.getUuid();
+    sheet.appendRow([id, name, 'Medicine', 0, true]);
+  });
+
+  Logger.log('bulkAddInventoryItems: added ' + newMedicines.length + ' items');
+}
+
 // ── Sales ────────────────────────────────────────────────────────
 
 function saveSale(body) {
