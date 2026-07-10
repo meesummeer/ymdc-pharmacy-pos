@@ -286,12 +286,34 @@ function escapeHtml(str) {
 }
 
 // ── Receipt HTML builder ─────────────────────────────────────────
+function normalizeReceiptInvoice(invoice) {
+  const items = (invoice.items || []).map(item => {
+    const name = item.name || item.itemName || '';
+    const qty = Number(item.qty) || 0;
+    const price = Number(item.price != null ? item.price : item.unitPrice) || 0;
+    const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : qty * price;
+    return { name, qty, price, lineTotal };
+  });
+  const total = invoice.total != null
+    ? Number(invoice.total)
+    : items.reduce((sum, item) => sum + item.lineTotal, 0);
+  return {
+    invoiceNo: invoice.invoiceNo || '',
+    date: formatDate(invoice.date) || invoice.date || '',
+    time: formatTimeDisplay(invoice.time),
+    patientName: invoice.patientName || '',
+    items,
+    total,
+  };
+}
+
 function buildReceiptHTML(invoice) {
-  const rows = invoice.items.map(item => `
+  const data = normalizeReceiptInvoice(invoice);
+  const rows = data.items.map(item => `
     <tr>
-      <td>${escapeHtml(item.itemName)}</td>
+      <td>${escapeHtml(item.name)}</td>
       <td class="num">${item.qty}</td>
-      <td class="num">${formatPKR(item.unitPrice)}</td>
+      <td class="num">${formatPKR(item.price)}</td>
       <td class="num">${formatPKR(item.lineTotal)}</td>
     </tr>
   `).join('');
@@ -299,14 +321,16 @@ function buildReceiptHTML(invoice) {
   return `
     <div class="receipt">
       <div class="receipt-header">
+        <img src="logo.jpeg" alt="YMDC" class="receipt-logo" width="48" height="48">
         <h2>${STORE_NAME}</h2>
         <p class="receipt-short">${STORE_SHORT}</p>
         <p class="receipt-address">${STORE_ADDRESS}</p>
       </div>
       <div class="receipt-meta">
-        <p><strong>Invoice:</strong> ${escapeHtml(invoice.invoiceNo)}</p>
-        <p><strong>Date:</strong> ${escapeHtml(invoice.date)} &nbsp; <strong>Time:</strong> ${escapeHtml(invoice.time)}</p>
-        ${invoice.patientName ? `<p><strong>Patient:</strong> ${escapeHtml(invoice.patientName)}</p>` : ''}
+        <p><strong>Invoice:</strong> ${escapeHtml(data.invoiceNo)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(data.date)}</p>
+        <p><strong>Time:</strong> ${escapeHtml(data.time === '—' ? '' : data.time)}</p>
+        ${data.patientName ? `<p><strong>Patient:</strong> ${escapeHtml(data.patientName)}</p>` : ''}
       </div>
       <table class="receipt-table">
         <thead>
@@ -321,21 +345,26 @@ function buildReceiptHTML(invoice) {
         <tfoot>
           <tr>
             <td colspan="3" class="total-label">Total</td>
-            <td class="num total-value">${formatPKR(invoice.total)}</td>
+            <td class="num total-value">${formatPKR(data.total)}</td>
           </tr>
         </tfoot>
       </table>
       <div class="receipt-footer">
         <p>WhatsApp: ${STORE_WHATSAPP}</p>
-        <p>Thank you for your visit!</p>
+        <p>Thank you — YMDC Pharmacy</p>
       </div>
     </div>
   `;
 }
 
-function printReceipt(invoice) {
-  const area = document.getElementById('print-area');
+function populateReceiptPrintArea(invoice) {
+  const area = document.getElementById('receipt-print-area');
+  if (!area) return;
   area.innerHTML = buildReceiptHTML(invoice);
+}
+
+function printReceipt(invoice) {
+  populateReceiptPrintArea(invoice);
   window.print();
 }
 

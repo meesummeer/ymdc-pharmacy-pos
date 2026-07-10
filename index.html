@@ -70,6 +70,11 @@
         </div>
       </div>
 
+      <div id="post-save-actions" class="card post-save-actions" hidden>
+        <p id="save-success-msg" class="save-success-msg"></p>
+        <button type="button" class="btn btn-gold" id="btn-print-receipt">Print Receipt</button>
+      </div>
+
       <div id="empty-cart" class="card empty-state">
         <div class="empty-state-icon">🛒</div>
         <p>Search and select items above to start a sale.</p>
@@ -81,12 +86,15 @@
     </footer>
   </div>
 
+  <div id="receipt-print-area" aria-hidden="true"></div>
+
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
     let inventory = [];
     let cart = [];
     let highlightIndex = -1;
+    let lastSavedInvoice = null;
 
     const searchInput = document.getElementById('search-input');
     const searchDropdown = document.getElementById('search-dropdown');
@@ -98,6 +106,9 @@
     const btnClearCart = document.getElementById('btn-clear-cart');
     const patientInput = document.getElementById('patient-name');
     const patientError = document.getElementById('patient-error');
+    const postSaveActions = document.getElementById('post-save-actions');
+    const saveSuccessMsg = document.getElementById('save-success-msg');
+    const btnPrintReceipt = document.getElementById('btn-print-receipt');
 
     setActiveNav('pos');
 
@@ -167,12 +178,13 @@
     function renderCart() {
       if (!cart.length) {
         cartSection.style.display = 'none';
-        emptyCart.style.display = 'block';
+        emptyCart.style.display = postSaveActions.hidden ? 'block' : 'none';
         btnSave.disabled = true;
         return;
       }
       cartSection.style.display = 'block';
       emptyCart.style.display = 'none';
+      postSaveActions.hidden = true;
       btnSave.disabled = false;
 
       cartBody.innerHTML = cart.map((item, idx) => `
@@ -283,6 +295,8 @@
     btnClearCart.addEventListener('click', () => {
       if (cart.length && confirm('Clear the entire cart?')) {
         cart = [];
+        lastSavedInvoice = null;
+        postSaveActions.hidden = true;
         renderCart();
       }
     });
@@ -290,6 +304,11 @@
     patientInput.addEventListener('input', () => {
       patientInput.classList.remove('input-error');
       patientError.classList.remove('visible');
+    });
+
+    btnPrintReceipt.addEventListener('click', () => {
+      if (!lastSavedInvoice) return;
+      printReceipt(lastSavedInvoice);
     });
 
     btnSave.addEventListener('click', async () => {
@@ -305,12 +324,32 @@
 
       btnSave.disabled = true;
       btnSave.textContent = 'Saving…';
+      postSaveActions.hidden = true;
       syncCartFromDOM(cartBody, cart);
       const saleData = buildSaleData(cart, patientName);
       console.log('SENDING:', JSON.stringify(saleData));
 
       try {
         const result = await apiPost(saleData);
+        const items = cart.map(item => ({
+          name: item.name,
+          category: item.category,
+          qty: item.qty,
+          price: Number(item.price) || 0,
+          lineTotal: item.qty * (Number(item.price) || 0),
+        }));
+        const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+        lastSavedInvoice = {
+          invoiceNo: result.invoiceNo,
+          date: result.date || saleData.date,
+          time: result.time || saleData.time,
+          patientName,
+          items,
+          total: result.total != null ? result.total : total,
+        };
+        populateReceiptPrintArea(lastSavedInvoice);
+        saveSuccessMsg.textContent = 'Invoice saved — ' + result.invoiceNo;
+        postSaveActions.hidden = false;
         showToast('Invoice saved — ' + result.invoiceNo, 'success');
         cart = [];
         patientInput.value = '';

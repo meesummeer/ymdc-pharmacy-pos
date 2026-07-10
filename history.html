@@ -106,6 +106,8 @@
     </div>
   </div>
 
+  <div id="receipt-print-area" aria-hidden="true"></div>
+
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
@@ -232,7 +234,10 @@
               <span class="invoice-card-field"><strong>Time:</strong> ${escapeHtml(timeDisplay)}</span>
               <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}</span>
             </div>
-            <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+            <div class="invoice-card-actions">
+              <button type="button" class="btn btn-secondary btn-sm btn-print-invoice" data-print="${escapeHtml(inv.invoiceNo)}" title="Print receipt">Print</button>
+              <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+            </div>
           </div>
           ${isExpanded ? `
             <div class="invoice-card-body">
@@ -297,6 +302,20 @@
     }
 
     historyContainer.addEventListener('click', (e) => {
+      const printBtn = e.target.closest('[data-print]');
+      if (printBtn) {
+        e.stopPropagation();
+        const invoiceNo = printBtn.dataset.print;
+        const inv = allInvoices.find(i => i.invoiceNo === invoiceNo)
+          || getFilteredInvoices().find(i => i.invoiceNo === invoiceNo);
+        if (!inv) {
+          showToast('Invoice not found', 'error');
+          return;
+        }
+        printReceipt(inv);
+        return;
+      }
+
       const card = e.target.closest('.invoice-card[data-invoice]');
       if (!card) return;
       const invoiceNo = card.dataset.invoice;
