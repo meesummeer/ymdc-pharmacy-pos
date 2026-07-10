@@ -109,7 +109,7 @@
   <div id="receipt-print-area" aria-hidden="true"></div>
 
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260710b"></script>
   <script>
     let allInvoices = [];
     let expandedInvoice = null;
@@ -303,17 +303,26 @@
     }
 
     historyContainer.addEventListener('click', (e) => {
-      const printBtn = e.target.closest('[data-print]');
+      const printBtn = e.target.closest('.btn-print-invoice, [data-print]');
       if (printBtn) {
+        e.preventDefault();
         e.stopPropagation();
-        const invoiceNo = printBtn.dataset.print;
-        const inv = allInvoices.find(i => i.invoiceNo === invoiceNo)
-          || getFilteredInvoices().find(i => i.invoiceNo === invoiceNo);
+        const invoiceNo = String(printBtn.getAttribute('data-print') || printBtn.dataset.print || '').trim();
+        const inv = allInvoices.find(i => String(i.invoiceNo).trim() === invoiceNo);
         if (!inv) {
-          showToast('Invoice not found', 'error');
+          console.error('Print: invoice not found', invoiceNo, allInvoices.map(i => i.invoiceNo));
+          showToast('Invoice not found for print', 'error');
           return;
         }
-        printReceipt(inv);
+        try {
+          if (typeof window.printReceipt !== 'function') {
+            throw new Error('printReceipt is not defined — hard refresh (Cmd+Shift+R)');
+          }
+          window.printReceipt(inv);
+        } catch (err) {
+          console.error('Print failed:', err);
+          showToast('Print failed: ' + err.message, 'error');
+        }
         return;
       }
 

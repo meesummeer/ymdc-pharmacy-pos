@@ -359,14 +359,28 @@ function buildReceiptHTML(invoice) {
 
 function populateReceiptPrintArea(invoice) {
   const area = document.getElementById('receipt-print-area');
-  if (!area) return;
+  if (!area) {
+    console.error('populateReceiptPrintArea: #receipt-print-area not found');
+    return false;
+  }
   area.innerHTML = buildReceiptHTML(invoice);
+  return true;
 }
 
 function printReceipt(invoice) {
+  if (!invoice) {
+    console.error('printReceipt: missing invoice data');
+    return;
+  }
   populateReceiptPrintArea(invoice);
   window.print();
 }
+
+// Expose on window so POS/history inline scripts always resolve these helpers
+window.normalizeReceiptInvoice = normalizeReceiptInvoice;
+window.buildReceiptHTML = buildReceiptHTML;
+window.populateReceiptPrintArea = populateReceiptPrintArea;
+window.printReceipt = printReceipt;
 
 // ── Active nav link ──────────────────────────────────────────────
 function setActiveNav(page) {

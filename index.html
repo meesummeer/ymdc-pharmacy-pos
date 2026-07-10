@@ -89,7 +89,7 @@
   <div id="receipt-print-area" aria-hidden="true"></div>
 
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260710b"></script>
   <script>
     let inventory = [];
     let cart = [];
@@ -308,7 +308,11 @@
 
     btnPrintReceipt.addEventListener('click', () => {
       if (!lastSavedInvoice) return;
-      printReceipt(lastSavedInvoice);
+      if (typeof window.printReceipt === 'function') {
+        window.printReceipt(lastSavedInvoice);
+      } else {
+        showToast('Print helper missing — hard refresh the page', 'error');
+      }
     });
 
     btnSave.addEventListener('click', async () => {
@@ -347,7 +351,6 @@
           items,
           total: result.total != null ? result.total : total,
         };
-        populateReceiptPrintArea(lastSavedInvoice);
         saveSuccessMsg.textContent = 'Invoice saved — ' + result.invoiceNo;
         postSaveActions.hidden = false;
         showToast('Invoice saved — ' + result.invoiceNo, 'success');
@@ -356,6 +359,15 @@
         patientInput.classList.remove('input-error');
         patientError.classList.remove('visible');
         renderCart();
+        try {
+          if (typeof window.populateReceiptPrintArea === 'function') {
+            window.populateReceiptPrintArea(lastSavedInvoice);
+          } else {
+            console.error('populateReceiptPrintArea missing — hard refresh (Cmd+Shift+R) to reload app.js');
+          }
+        } catch (printErr) {
+          console.error('Receipt populate failed (invoice still saved):', printErr);
+        }
       } catch (err) {
         showToast('Save failed: ' + err.message, 'error');
         btnSave.disabled = false;
