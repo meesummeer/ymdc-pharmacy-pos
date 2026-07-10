@@ -783,6 +783,20 @@ td.num, th.num { text-align: right; }
   background: #F9FAFB;
 }
 
+.invoice-card-body-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.invoice-card-body-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .invoice-card-body table {
   font-size: 13px;
 }
@@ -922,15 +936,9 @@ input.input-error {
   color: var(--success);
 }
 
-.invoice-card-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
 .btn-print-invoice {
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── Print / thermal receipt ────────────────────────────────────── */

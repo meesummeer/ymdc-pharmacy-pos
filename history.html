@@ -234,13 +234,14 @@
               <span class="invoice-card-field"><strong>Time:</strong> ${escapeHtml(timeDisplay)}</span>
               <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}</span>
             </div>
-            <div class="invoice-card-actions">
-              <button type="button" class="btn btn-secondary btn-sm btn-print-invoice" data-print="${escapeHtml(inv.invoiceNo)}" title="Print receipt">Print</button>
-              <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
-            </div>
+            <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
           </div>
           ${isExpanded ? `
             <div class="invoice-card-body">
+              <div class="invoice-card-body-toolbar">
+                <span class="invoice-card-body-label">Line items</span>
+                <button type="button" class="btn btn-primary btn-sm btn-print-invoice" data-print="${escapeHtml(inv.invoiceNo)}" title="Print receipt">Print</button>
+              </div>
               <table>
                 <thead>
                   <tr>
