@@ -106,10 +106,8 @@
     </div>
   </div>
 
-  <div id="receipt-print-area" aria-hidden="true"></div>
-
   <script src="config.js"></script>
-  <script src="app.js?v=20260710b"></script>
+  <script src="app.js"></script>
   <script>
     let allInvoices = [];
     let expandedInvoice = null;
@@ -238,10 +236,6 @@
           </div>
           ${isExpanded ? `
             <div class="invoice-card-body">
-              <div class="invoice-card-body-toolbar">
-                <span class="invoice-card-body-label">Line items</span>
-                <button type="button" class="btn btn-primary btn-sm btn-print-invoice" data-print="${escapeHtml(inv.invoiceNo)}" title="Print receipt">Print</button>
-              </div>
               <table>
                 <thead>
                   <tr>
@@ -303,29 +297,6 @@
     }
 
     historyContainer.addEventListener('click', (e) => {
-      const printBtn = e.target.closest('.btn-print-invoice, [data-print]');
-      if (printBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        const invoiceNo = String(printBtn.getAttribute('data-print') || printBtn.dataset.print || '').trim();
-        const inv = allInvoices.find(i => String(i.invoiceNo).trim() === invoiceNo);
-        if (!inv) {
-          console.error('Print: invoice not found', invoiceNo, allInvoices.map(i => i.invoiceNo));
-          showToast('Invoice not found for print', 'error');
-          return;
-        }
-        try {
-          if (typeof window.printReceipt !== 'function') {
-            throw new Error('printReceipt is not defined — hard refresh (Cmd+Shift+R)');
-          }
-          window.printReceipt(inv);
-        } catch (err) {
-          console.error('Print failed:', err);
-          showToast('Print failed: ' + err.message, 'error');
-        }
-        return;
-      }
-
       const card = e.target.closest('.invoice-card[data-invoice]');
       if (!card) return;
       const invoiceNo = card.dataset.invoice;

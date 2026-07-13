@@ -245,6 +245,49 @@ function appendSaleRow(sheet, row) {
   sheet.getRange(rowNum, 2).setValue(String(row[1]));
   sheet.getRange(rowNum, 3).setValue(String(row[2]));
 }
+
+function isDaySeparatorRow(row) {
+  var a = String(row[0] || '').trim();
+  if (!a) return false;
+  if (a.indexOf('—') !== -1 && !String(row[4] || '').trim()) return true;
+  return false;
+}
+
+function getLastSaleDateStr(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '';
+
+  for (var r = lastRow; r >= 2; r--) {
+    var vals = sheet.getRange(r, 1, 1, 5).getValues()[0];
+    if (isDaySeparatorRow(vals)) {
+      var match = String(vals[0] || '').match(/(\d{2}\/\d{2}\/\d{4})/);
+      if (match) return match[1];
+      continue;
+    }
+    var dateFromB = normalizeCellDate(vals[1]);
+    if (dateFromB) return dateFromB;
+  }
+  return '';
+}
+
+function insertDaySeparatorRow(sheet, dateStr) {
+  var rowNum = sheet.getLastRow() + 1;
+  var label = '— ' + dateStr + ' —';
+  sheet.getRange(rowNum, 1, 1, 9).setValues([[label, '', '', '', '', '', '', '', '']]);
+  var range = sheet.getRange(rowNum, 1, 1, 9);
+  range.setBackground('#F4CCCC');
+  range.setFontWeight('bold');
+  range.setHorizontalAlignment('center');
+  sheet.getRange(rowNum, 1).setHorizontalAlignment('center');
+}
+
+function maybeInsertDaySeparator(sheet, dateStr) {
+  var lastDate = getLastSaleDateStr(sheet);
+  if (!lastDate || lastDate !== String(dateStr)) {
+    insertDaySeparatorRow(sheet, dateStr);
+  }
+}
+
 function normalizeCellDate(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
     return formatSheetDate(value);
@@ -257,11 +300,16 @@ function normalizeCellDate(value) {
 }
 
 function readSaleItem(row) {
+  const qty = Number(row[6]) || 0;
+  const price = Number(row[7]) || 0;
+  const hasStoredTotal = row.length > 8 && row[8] !== '' && row[8] != null;
+  const storedTotal = hasStoredTotal ? Number(row[8]) : NaN;
   return {
     name: String(row[4] || ''),
     category: String(row[5] || ''),
-    qty: Number(row[6]) || 0,
-    price: Number(row[7]) || 0,
+    qty: qty,
+    price: price,
+    lineTotal: !isNaN(storedTotal) ? storedTotal : lineTotal(qty, price),
   };
 }
 
@@ -502,6 +550,7 @@ function saveSale(body) {
 
   const sheet = getSheet(SHEETS.SALES);
   migrateSalesSheet();
+  maybeInsertDaySeparator(sheet, dateStr);
 
   body.items.forEach(function(item) {
     const name = String(item.name || '');
@@ -537,11 +586,11 @@ function updateDailySummary() {
 
   for (let i = 1; i < salesData.length; i++) {
     const row = salesData[i];
-    if (!row[0]) continue;
+    if (!row[0] || isDaySeparatorRow(row)) continue;
     const d = normalizeCellDate(row[1]);
     const invoiceNo = String(row[0]);
     const item = readSaleItem(row);
-    const rowTotal = lineTotal(item.qty, item.price);
+    const rowTotal = item.lineTotal != null ? item.lineTotal : lineTotal(item.qty, item.price);
 
     if (!dayStats[d]) {
       dayStats[d] = { invoices: {}, revenue: 0 };
@@ -582,10 +631,10 @@ function getHistoryData() {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const invoiceNo = String(row[0] || '').trim();
-    if (!invoiceNo) continue;
+    if (!invoiceNo || isDaySeparatorRow(row)) continue;
 
     const item = readSaleItem(row);
-    const rowTotal = lineTotal(item.qty, item.price);
+    const rowTotal = item.lineTotal != null ? item.lineTotal : lineTotal(item.qty, item.price);
 
     if (!invoiceMap[invoiceNo]) {
       invoiceMap[invoiceNo] = {
