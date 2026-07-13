@@ -13,7 +13,7 @@ const SHEETS = {
   CONFIG: 'Config',
 };
 
-const SALES_HEADERS = ['Invoice No', 'Date', 'Time', 'Patient Name', 'Item Name', 'Category', 'Qty', 'Unit Price'];
+const SALES_HEADERS = ['Invoice No', 'Date', 'Time', 'Patient Name', 'Item Name', 'Category', 'Qty', 'Unit Price', 'Total Paid'];
 
 // ── JSON helpers ─────────────────────────────────────────────────
 
@@ -240,7 +240,7 @@ function normalizeCellTime(value) {
 
 function appendSaleRow(sheet, row) {
   var rowNum = sheet.getLastRow() + 1;
-  sheet.getRange(rowNum, 1, 1, 8).setValues([row]);
+  sheet.getRange(rowNum, 1, 1, 9).setValues([row]);
   sheet.getRange(rowNum, 2, 1, 2).setNumberFormat('@');
   sheet.getRange(rowNum, 2).setValue(String(row[1]));
   sheet.getRange(rowNum, 3).setValue(String(row[2]));
@@ -508,7 +508,8 @@ function saveSale(body) {
     const category = String(item.category || '');
     const qty = Number(item.qty) || 0;
     const price = Number(item.price) || 0;
-    appendSaleRow(sheet, [invoiceNo, dateStr, timeStr, patientName, name, category, qty, price]);
+    const totalPaid = qty * price;
+    appendSaleRow(sheet, [invoiceNo, dateStr, timeStr, patientName, name, category, qty, price, totalPaid]);
   });
 
   const total = body.items.reduce(function(sum, item) {
