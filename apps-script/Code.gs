@@ -248,44 +248,80 @@ function appendSaleRow(sheet, row) {
 
 function isDaySeparatorRow(row) {
   var a = String(row[0] || '').trim();
-  if (!a) return false;
+  var h = String(row[7] || '').trim();
+  if (h.indexOf('TOTAL') === 0) return true;
   if (a.indexOf('—') !== -1 && !String(row[4] || '').trim()) return true;
   return false;
 }
 
-function getLastSaleDateStr(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return '';
-
-  for (var r = lastRow; r >= 2; r--) {
-    var vals = sheet.getRange(r, 1, 1, 5).getValues()[0];
-    if (isDaySeparatorRow(vals)) {
-      var match = String(vals[0] || '').match(/(\d{2}\/\d{2}\/\d{4})/);
-      if (match) return match[1];
-      continue;
-    }
-    var dateFromB = normalizeCellDate(vals[1]);
-    if (dateFromB) return dateFromB;
-  }
-  return '';
+function isNonSaleDataRow(row) {
+  var a = String(row[0] || '').trim();
+  var b = row[1];
+  var h = String(row[7] || '').trim();
+  if (a === 'Invoice No') return true;
+  if (isDaySeparatorRow(row)) return true;
+  if (h.indexOf('TOTAL') === 0) return true;
+  if (!a && (b === '' || b == null) && !String(row[4] || '').trim() && !h) return true;
+  return false;
 }
 
-function insertDaySeparatorRow(sheet, dateStr) {
+function looksLikeDateStr(value) {
+  var d = normalizeCellDate(value);
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(d) ? d : '';
+}
+
+function findLastRealSaleDate(data) {
+  for (var i = data.length - 1; i >= 1; i--) {
+    var row = data[i];
+    if (isNonSaleDataRow(row)) continue;
+    var dateStr = looksLikeDateStr(row[1]);
+    if (dateStr) {
+      return { dateStr: dateStr, rowIndex: i };
+    }
+  }
+  return { dateStr: '', rowIndex: -1 };
+}
+
+function sumTotalPaidForDate(data, dateStr) {
+  var sum = 0;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (isNonSaleDataRow(row)) continue;
+    if (looksLikeDateStr(row[1]) !== dateStr) continue;
+    var item = readSaleItem(row);
+    sum += item.lineTotal != null ? Number(item.lineTotal) : lineTotal(item.qty, item.price);
+  }
+  return sum;
+}
+
+function hasSummaryAfterDate(data, dateStr, afterIndex) {
+  var expected = 'TOTAL — ' + dateStr;
+  for (var i = afterIndex + 1; i < data.length; i++) {
+    var h = String(data[i][7] || '').trim();
+    if (h === expected || h.indexOf(expected) === 0) return true;
+    if (looksLikeDateStr(data[i][1])) break;
+  }
+  return false;
+}
+
+function insertDailyTotalSummaryRow(sheet, previousDateStr, previousDayTotal) {
   var rowNum = sheet.getLastRow() + 1;
-  var label = '— ' + dateStr + ' —';
-  sheet.getRange(rowNum, 1, 1, 9).setValues([[label, '', '', '', '', '', '', '', '']]);
+  var label = 'TOTAL — ' + previousDateStr;
+  sheet.getRange(rowNum, 1, 1, 9).setValues([['', '', '', '', '', '', '', label, previousDayTotal]]);
   var range = sheet.getRange(rowNum, 1, 1, 9);
   range.setBackground('#F4CCCC');
   range.setFontWeight('bold');
-  range.setHorizontalAlignment('center');
-  sheet.getRange(rowNum, 1).setHorizontalAlignment('center');
 }
 
-function maybeInsertDaySeparator(sheet, dateStr) {
-  var lastDate = getLastSaleDateStr(sheet);
-  if (!lastDate || lastDate !== String(dateStr)) {
-    insertDaySeparatorRow(sheet, dateStr);
-  }
+function maybeInsertPreviousDayTotal(sheet, todayDateStr) {
+  var data = sheet.getDataRange().getValues();
+  var last = findLastRealSaleDate(data);
+  if (!last.dateStr) return;
+  if (last.dateStr === String(todayDateStr)) return;
+  if (hasSummaryAfterDate(data, last.dateStr, last.rowIndex)) return;
+
+  var previousDayTotal = sumTotalPaidForDate(data, last.dateStr);
+  insertDailyTotalSummaryRow(sheet, last.dateStr, previousDayTotal);
 }
 
 function normalizeCellDate(value) {
@@ -550,7 +586,7 @@ function saveSale(body) {
 
   const sheet = getSheet(SHEETS.SALES);
   migrateSalesSheet();
-  maybeInsertDaySeparator(sheet, dateStr);
+  maybeInsertPreviousDayTotal(sheet, dateStr);
 
   body.items.forEach(function(item) {
     const name = String(item.name || '');
