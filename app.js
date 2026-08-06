@@ -25,7 +25,7 @@ function showToast(message, type = 'info') {
 }
 
 // ── API helpers ──────────────────────────────────────────────────
-async function apiGet(action) {
+async function apiGet(action, isRetry) {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`;
   try {
     const res = await fetch(url);
@@ -35,6 +35,10 @@ async function apiGet(action) {
       data = JSON.parse(text);
     } catch (parseErr) {
       console.error('API GET non-JSON response:', action, text.slice(0, 200));
+      if (!isRetry) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return apiGet(action, true);
+      }
       throw new Error(`Invalid server response (${res.status})`);
     }
     if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
