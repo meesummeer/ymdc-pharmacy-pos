@@ -25,14 +25,26 @@ function showToast(message, type = 'info') {
 }
 
 // ── Supabase data helpers ──────────────────────────────────────────
+const SUPABASE_PAGE_SIZE = 1000;
+
+async function fetchAllPages(queryBuilderFactory) {
+  let allRows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryBuilderFactory().range(from, from + SUPABASE_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || !data.length) break;
+    allRows = allRows.concat(data);
+    if (data.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+  return allRows;
+}
+
 async function fetchInventory() {
-  const { data, error } = await db
-    .from('inventory')
-    .select('*')
-    .eq('active', true)
-    .order('name');
-  if (error) throw new Error(error.message);
-  return data || [];
+  return fetchAllPages(() =>
+    db.from('inventory').select('*').eq('active', true).order('name')
+  );
 }
 
 async function createSale(patientName, paymentMethod, cart, soldAt) {
@@ -78,12 +90,9 @@ async function deleteInventoryItem(id) {
 }
 
 async function fetchHistory() {
-  const { data, error } = await db
-    .from('invoices')
-    .select('*, sale_items(*)')
-    .order('sold_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return data || [];
+  return fetchAllPages(() =>
+    db.from('invoices').select('*, sale_items(*)').order('sold_at', { ascending: false })
+  );
 }
 
 async function deleteInvoice(id) {
@@ -92,11 +101,10 @@ async function deleteInvoice(id) {
 }
 
 async function fetchInvoiceStats() {
-  const { data, error } = await db
-    .from('invoices')
-    .select('sold_at, payment_method, sale_items(qty, unit_price)');
-  if (error) throw new Error(error.message);
-  return (data || []).map(inv => ({
+  const data = await fetchAllPages(() =>
+    db.from('invoices').select('sold_at, payment_method, sale_items(qty, unit_price)').order('sold_at', { ascending: true })
+  );
+  return data.map(inv => ({
     sold_at: inv.sold_at,
     payment_method: inv.payment_method,
     total: (inv.sale_items || []).reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0),

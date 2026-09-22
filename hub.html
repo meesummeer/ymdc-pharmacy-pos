@@ -100,6 +100,14 @@
   <script>
     setActiveNav('hub');
 
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    function monthKeyToLabel(key) {
+      const [year, month] = key.split('-');
+      const idx = parseInt(month, 10) - 1;
+      return `${MONTH_NAMES[idx] || month} ${year}`;
+    }
+
     function renderEmptyChart(container, message) {
       container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><p>${escapeHtml(message)}</p></div>`;
     }
@@ -129,7 +137,7 @@
               <div class="bar-col">
                 <div class="bar-value">${formatPKR(value)}</div>
                 <div class="bar" style="height:${heightPct}%"></div>
-                <div class="bar-label">${escapeHtml(m)}</div>
+                <div class="bar-label">${escapeHtml(monthKeyToLabel(m))}</div>
               </div>
             `;
           }).join('')}
