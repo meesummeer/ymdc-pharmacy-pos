@@ -58,13 +58,22 @@
       <div id="page-content" style="display:none">
         <h2 class="page-title">Admin Hub</h2>
 
+        <div class="filter-bar card">
+          <div id="hub-range-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
+            Loading…
+          </div>
+          <div class="filter-bar-actions">
+            <button class="btn btn-primary btn-sm" id="hub-btn-open-filter">Filter</button>
+          </div>
+        </div>
+
         <div class="card-grid">
           <div class="card stat-card">
             <span class="stat-label">Total Invoices</span>
             <span class="stat-value" id="stat-invoice-count">0</span>
           </div>
           <div class="card stat-card">
-            <span class="stat-label">All-Time Revenue</span>
+            <span class="stat-label">Revenue</span>
             <span class="stat-value" id="stat-revenue">PKR 0</span>
           </div>
           <div class="card stat-card">
@@ -94,6 +103,37 @@
     </footer>
   </div>
 
+  <div class="modal-overlay filter-modal" id="hub-filter-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Filter Revenue</h3>
+        <button class="modal-close" id="hub-filter-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="filter-section-title">Date Range</div>
+        <div class="form-group">
+          <label for="hub-date-from" class="form-label">From</label>
+          <input type="text" id="hub-date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="hub-date-to" class="form-label">To</label>
+          <input type="text" id="hub-date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="preset-pills" id="hub-preset-pills" style="margin-top:20px;margin-bottom:0">
+          <button type="button" class="preset-pill" data-preset="today">Today</button>
+          <button type="button" class="preset-pill" data-preset="this-week">This Week</button>
+          <button type="button" class="preset-pill" data-preset="this-month">This Month</button>
+          <button type="button" class="preset-pill" data-preset="last-month">Last Month</button>
+          <button type="button" class="preset-pill" data-preset="all-time">All Time</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-text" id="hub-filter-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="hub-filter-apply">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
@@ -102,10 +142,34 @@
 
     const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+    let allHubInvoices = [];
+    let hubDateFrom = '';
+    let hubDateTo = '';
+
+    const hubFilterModal = document.getElementById('hub-filter-modal');
+
     function monthKeyToLabel(key) {
       const [year, month] = key.split('-');
       const idx = parseInt(month, 10) - 1;
       return `${MONTH_NAMES[idx] || month} ${year}`;
+    }
+
+    function formatRangeLabel(from, to) {
+      if (!from && !to) return 'All Time';
+      const f = parseDMYParts(from);
+      const t = parseDMYParts(to);
+      if (!f || !t) return `${from} – ${to}`;
+      const monthName = (parts) => MONTH_NAMES[parts.month - 1];
+      const sameMonth = f.year === t.year && f.month === t.month;
+      const sameDay = sameMonth && f.day === t.day;
+      if (sameDay) return `${monthName(f)} ${f.day}, ${f.year}`;
+      if (sameMonth) return `${monthName(f)} ${f.day}–${t.day}, ${f.year}`;
+      if (f.year === t.year) return `${monthName(f)} ${f.day} – ${monthName(t)} ${t.day}, ${f.year}`;
+      return `${monthName(f)} ${f.day}, ${f.year} – ${monthName(t)} ${t.day}, ${t.year}`;
+    }
+
+    function getFilteredHubInvoices() {
+      return allHubInvoices.filter(inv => dateInRange(formatSoldAtDate(inv.sold_at), hubDateFrom, hubDateTo));
     }
 
     function renderEmptyChart(container, message) {
@@ -175,28 +239,71 @@
       `;
     }
 
+    function renderHub() {
+      const invoices = getFilteredHubInvoices();
+      const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+      document.getElementById('stat-invoice-count').textContent = invoices.length.toLocaleString('en-PK');
+      document.getElementById('stat-revenue').textContent = formatPKR(totalRevenue);
+      document.getElementById('stat-cash').textContent = formatPKR(
+        invoices.filter(inv => inv.payment_method !== 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+      );
+      document.getElementById('stat-bank').textContent = formatPKR(
+        invoices.filter(inv => inv.payment_method === 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+      );
+      document.getElementById('hub-range-summary').textContent = formatRangeLabel(hubDateFrom, hubDateTo);
+      renderRevenueChart(invoices);
+      renderPaymentBreakdown(invoices);
+    }
+
     async function loadHub() {
       if (currentRole !== 'admin') {
         location.replace('index.html');
         return;
       }
       try {
-        const invoices = await fetchInvoiceStats();
-        const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-        document.getElementById('stat-invoice-count').textContent = invoices.length.toLocaleString('en-PK');
-        document.getElementById('stat-revenue').textContent = formatPKR(totalRevenue);
-        document.getElementById('stat-cash').textContent = formatPKR(
-          invoices.filter(inv => inv.payment_method !== 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
-        );
-        document.getElementById('stat-bank').textContent = formatPKR(
-          invoices.filter(inv => inv.payment_method === 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
-        );
-        renderRevenueChart(invoices);
-        renderPaymentBreakdown(invoices);
+        allHubInvoices = await fetchInvoiceStats();
+        const range = getCurrentMonthRange();
+        hubDateFrom = range.from;
+        hubDateTo = range.to;
+        renderHub();
       } catch (err) {
         showToast('Failed to load Hub data: ' + err.message, 'error');
       }
     }
+
+    function openHubFilterModal() {
+      document.getElementById('hub-date-from').value = hubDateFrom;
+      document.getElementById('hub-date-to').value = hubDateTo;
+      document.querySelectorAll('#hub-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      hubFilterModal.classList.add('open');
+    }
+
+    function closeHubFilterModal() {
+      hubFilterModal.classList.remove('open');
+    }
+
+    document.getElementById('hub-btn-open-filter').addEventListener('click', openHubFilterModal);
+    document.getElementById('hub-filter-modal-close').addEventListener('click', closeHubFilterModal);
+    document.getElementById('hub-filter-cancel').addEventListener('click', closeHubFilterModal);
+    hubFilterModal.addEventListener('click', (e) => { if (e.target === hubFilterModal) closeHubFilterModal(); });
+
+    document.getElementById('hub-preset-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      const preset = pill.dataset.preset;
+      const range = preset === 'all-time' ? { from: '', to: '' } : getDateRangePreset(preset);
+      document.getElementById('hub-date-from').value = range.from;
+      document.getElementById('hub-date-to').value = range.to;
+      document.querySelectorAll('#hub-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    document.getElementById('hub-filter-apply').addEventListener('click', () => {
+      hubDateFrom = document.getElementById('hub-date-from').value.trim();
+      hubDateTo = document.getElementById('hub-date-to').value.trim();
+      closeHubFilterModal();
+      renderHub();
+    });
 
     wireAuthGate();
     initAuthGate(loadHub);

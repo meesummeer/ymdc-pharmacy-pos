@@ -84,6 +84,12 @@ async function updateInventoryItem(id, fields) {
   if (error) throw new Error(error.message);
 }
 
+async function updateItemPrice(itemId, price) {
+  const { data, error } = await db.rpc('update_item_price', { p_item_id: itemId, p_price: price });
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
+}
+
 async function deleteInventoryItem(id) {
   const { error } = await db.from('inventory').update({ active: false }).eq('id', id);
   if (error) throw new Error(error.message);

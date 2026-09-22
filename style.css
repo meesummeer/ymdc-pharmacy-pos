@@ -268,6 +268,13 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
 }
 
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
 .input-lg {
   height: 48px;
   padding: 0 16px;

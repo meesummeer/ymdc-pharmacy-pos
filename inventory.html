@@ -173,6 +173,7 @@
         return;
       }
       const isAdmin = currentRole === 'admin';
+      const isPharmacist = currentRole === 'pharmacist';
       inventoryBody.innerHTML = items.map(item => {
         const qty = item.quantity || 0;
         return `
@@ -189,7 +190,7 @@
           <td class="num">${item.price ? formatPKR(item.price) : '—'}</td>
           <td>
             <div class="row-actions">
-              ${isAdmin ? `<button class="btn-icon-only btn-edit" title="Edit item">✎</button>` : ''}
+              ${(isAdmin || isPharmacist) ? `<button class="btn-icon-only btn-edit" title="${isAdmin ? 'Edit item' : 'Edit price'}">✎</button>` : ''}
               ${isAdmin ? `<button class="btn-icon-only danger btn-delete" title="Delete item">🗑</button>` : ''}
             </div>
           </td>
@@ -199,14 +200,20 @@
     }
 
     function openModal(mode, item) {
-      modalTitle.textContent = mode === 'edit' ? 'Edit Item' : 'Add Item';
+      const priceOnly = mode === 'edit' && currentRole === 'pharmacist';
+      modalTitle.textContent = mode === 'edit' ? (priceOnly ? 'Edit Price' : 'Edit Item') : 'Add Item';
       editId.value = item ? item.id : '';
       itemName.value = item ? item.name : '';
       itemCategory.value = item ? item.category : 'Medicine';
       itemPrice.value = item ? (item.price || 0) : 0;
       itemQuantity.value = item ? (item.quantity || 0) : 0;
+
+      itemName.disabled = priceOnly;
+      itemCategory.disabled = priceOnly;
+      itemQuantity.disabled = priceOnly;
+
       itemModal.classList.add('open');
-      itemName.focus();
+      (priceOnly ? itemPrice : itemName).focus();
     }
 
     function closeModal() {
@@ -261,6 +268,22 @@
     itemModal.addEventListener('click', (e) => { if (e.target === itemModal) closeModal(); });
 
     document.getElementById('modal-save').addEventListener('click', async () => {
+      const priceOnly = editId.value && currentRole === 'pharmacist';
+
+      if (priceOnly) {
+        const price = Number(parseFloat(itemPrice.value)) || 0;
+        try {
+          await updateItemPrice(editId.value, price);
+          showToast('Price updated', 'success');
+          closeModal();
+          await loadInventory();
+        } catch (err) {
+          console.error('Price update failed:', err);
+          showToast('Save failed: ' + err.message, 'error');
+        }
+        return;
+      }
+
       const name = itemName.value.trim();
       if (!name) {
         showToast('Item name is required', 'warning');
