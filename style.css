@@ -859,12 +859,22 @@ td.num, th.num { text-align: right; }
   font-weight: 500;
 }
 
+.invoice-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .invoice-card-total {
   font-weight: 700;
   color: var(--gold);
   font-size: 16px;
   white-space: nowrap;
   text-align: right;
+}
+
+.btn-delete-invoice {
+  flex-shrink: 0;
 }
 
 .invoice-card-body {

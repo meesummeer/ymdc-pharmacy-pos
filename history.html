@@ -238,9 +238,10 @@
       const isExpanded = expandedInvoice === inv.invoice_no;
       const items = inv.items || [];
       const timeDisplay = formatTimeDisplay(inv.sold_at);
+      const isAdmin = currentRole === 'admin';
 
       return `
-        <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoice_no)}">
+        <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoice_no)}" data-id="${escapeHtml(inv.id)}">
           <div class="invoice-card-header">
             <div class="invoice-card-top">
               <span class="invoice-card-no">${escapeHtml(inv.invoice_no)} ${isExpanded ? '▾' : '▸'}</span>
@@ -249,7 +250,10 @@
               <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patient_name ? escapeHtml(inv.patient_name) : '—'}</span>
               <span class="pill pill-other">${escapeHtml(inv.payment_method || '—')}</span>
             </div>
-            <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+            <div class="invoice-card-header-right">
+              <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+              ${isAdmin ? `<button type="button" class="btn-icon-only danger btn-delete-invoice" title="Delete invoice">🗑</button>` : ''}
+            </div>
           </div>
           ${isExpanded ? `
             <div class="invoice-card-body">
@@ -305,7 +309,25 @@
       renderHistory();
     }
 
-    historyContainer.addEventListener('click', (e) => {
+    historyContainer.addEventListener('click', async (e) => {
+      const deleteBtn = e.target.closest('.btn-delete-invoice');
+      if (deleteBtn) {
+        const card = deleteBtn.closest('.invoice-card[data-invoice]');
+        if (!card) return;
+        const id = card.dataset.id;
+        const invoiceNo = card.dataset.invoice;
+        if (!confirm(`Permanently delete invoice ${invoiceNo} and its line items?\n\nThis does NOT restore inventory quantity — the sale's stock deduction stays as-is.`)) return;
+        try {
+          await deleteInvoice(id);
+          allInvoices = allInvoices.filter(inv => inv.id !== id);
+          showToast('Invoice deleted', 'success');
+          renderHistory();
+        } catch (err) {
+          showToast('Delete failed: ' + err.message, 'error');
+        }
+        return;
+      }
+
       const card = e.target.closest('.invoice-card[data-invoice]');
       if (!card) return;
       const invoiceNo = card.dataset.invoice;

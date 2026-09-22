@@ -85,6 +85,11 @@ async function fetchHistory() {
   return data || [];
 }
 
+async function deleteInvoice(id) {
+  const { error } = await db.from('invoices').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 async function fetchInvoiceStats() {
   const { data, error } = await db.from('invoices').select('total, sold_at, payment_method');
   if (error) throw new Error(error.message);
