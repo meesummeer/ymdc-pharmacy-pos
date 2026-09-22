@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="hub.html" class="nav-link active" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Admin Hub</h2>
+
+        <div class="card-grid">
+          <div class="card stat-card">
+            <span class="stat-label">Total Invoices</span>
+            <span class="stat-value" id="stat-invoice-count">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">All-Time Revenue</span>
+            <span class="stat-value" id="stat-revenue">PKR 0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Cash</span>
+            <span class="stat-value" id="stat-cash">PKR 0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Bank Transfer</span>
+            <span class="stat-value" id="stat-bank">PKR 0</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Revenue by Month</h3>
+          <div id="revenue-chart-wrap"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Payment Method Breakdown</h3>
+          <div id="payment-breakdown-wrap"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    setActiveNav('hub');
+
+    function renderEmptyChart(container, message) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><p>${escapeHtml(message)}</p></div>`;
+    }
+
+    function renderRevenueChart(invoices) {
+      const wrap = document.getElementById('revenue-chart-wrap');
+      if (!invoices.length) {
+        renderEmptyChart(wrap, 'No sales recorded yet — the chart will fill in as invoices come through.');
+        return;
+      }
+
+      const byMonth = {};
+      invoices.forEach(inv => {
+        const key = soldAtMonthKey(inv.sold_at);
+        byMonth[key] = (byMonth[key] || 0) + (Number(inv.total) || 0);
+      });
+
+      const months = Object.keys(byMonth).sort();
+      const maxRevenue = Math.max(...months.map(m => byMonth[m]), 1);
+
+      wrap.innerHTML = `
+        <div class="bar-chart">
+          ${months.map(m => {
+            const value = byMonth[m];
+            const heightPct = Math.max(4, Math.round((value / maxRevenue) * 100));
+            return `
+              <div class="bar-col">
+                <div class="bar-value">${formatPKR(value)}</div>
+                <div class="bar" style="height:${heightPct}%"></div>
+                <div class="bar-label">${escapeHtml(m)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderPaymentBreakdown(invoices) {
+      const wrap = document.getElementById('payment-breakdown-wrap');
+      if (!invoices.length) {
+        renderEmptyChart(wrap, 'No sales recorded yet.');
+        return;
+      }
+
+      let cash = 0;
+      let bank = 0;
+      invoices.forEach(inv => {
+        const total = Number(inv.total) || 0;
+        if (inv.payment_method === 'Bank Transfer') bank += total;
+        else cash += total;
+      });
+      const max = Math.max(cash, bank, 1);
+
+      wrap.innerHTML = `
+        <div class="payment-breakdown">
+          <div class="payment-breakdown-item">
+            <div class="payment-breakdown-label"><span>Cash</span><strong>${formatPKR(cash)}</strong></div>
+            <div class="payment-breakdown-bar"><div class="payment-breakdown-bar-fill cash" style="width:${Math.round((cash / max) * 100)}%"></div></div>
+          </div>
+          <div class="payment-breakdown-item">
+            <div class="payment-breakdown-label"><span>Bank Transfer</span><strong>${formatPKR(bank)}</strong></div>
+            <div class="payment-breakdown-bar"><div class="payment-breakdown-bar-fill bank" style="width:${Math.round((bank / max) * 100)}%"></div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadHub() {
+      if (currentRole !== 'admin') {
+        location.replace('index.html');
+        return;
+      }
+      try {
+        const invoices = await fetchInvoiceStats();
+        const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+        document.getElementById('stat-invoice-count').textContent = invoices.length.toLocaleString('en-PK');
+        document.getElementById('stat-revenue').textContent = formatPKR(totalRevenue);
+        document.getElementById('stat-cash').textContent = formatPKR(
+          invoices.filter(inv => inv.payment_method !== 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+        );
+        document.getElementById('stat-bank').textContent = formatPKR(
+          invoices.filter(inv => inv.payment_method === 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+        );
+        renderRevenueChart(invoices);
+        renderPaymentBreakdown(invoices);
+      } catch (err) {
+        showToast('Failed to load Hub data: ' + err.message, 'error');
+      }
+    }
+
+    wireAuthGate();
+    initAuthGate(loadHub);
+  </script>
+</body>
+</html>

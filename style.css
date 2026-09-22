@@ -133,6 +133,12 @@ body {
   text-transform: uppercase;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .main-nav {
   display: flex;
   align-items: center;
@@ -159,6 +165,40 @@ body {
   background: var(--gold);
   color: var(--navy);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(201, 168, 76, 0.45);
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.user-email {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gold);
+  text-decoration: none;
+  padding: 5px 10px;
+  border-radius: 20px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.logout-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 /* ── Footer ───────────────────────────────────────────────────── */
@@ -334,8 +374,9 @@ input:focus, select:focus, textarea:focus {
 .btn-primary {
   background: var(--navy);
   color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 51, 102, 0.25);
 }
-.btn-primary:hover:not(:disabled) { background: var(--navy-dark); }
+.btn-primary:hover:not(:disabled) { background: var(--navy-dark); box-shadow: 0 4px 10px rgba(0, 51, 102, 0.3); }
 
 .btn-secondary {
   background: #fff;
@@ -347,8 +388,9 @@ input:focus, select:focus, textarea:focus {
 .btn-gold {
   background: var(--gold);
   color: #fff;
+  box-shadow: 0 1px 3px rgba(201, 168, 76, 0.35);
 }
-.btn-gold:hover:not(:disabled) { background: var(--gold-dark); }
+.btn-gold:hover:not(:disabled) { background: var(--gold-dark); box-shadow: 0 4px 10px rgba(201, 168, 76, 0.4); }
 
 .btn-danger {
   background: var(--error-bg);
@@ -473,6 +515,53 @@ td.num, th.num { text-align: right; }
   text-align: center;
   padding: 6px 4px;
   border-radius: 6px;
+}
+
+.qty-controls input.qty-input[readonly] {
+  background: var(--bg);
+  cursor: default;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.qty-controls input.qty-input.input-error {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.qty-controls .qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qty-controls .qty-btn:disabled:hover {
+  background: #fff;
+  color: var(--navy);
+  border-color: var(--border);
+}
+
+/* ── Row actions (inventory table) ───────────────────────────────── */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.row-actions .btn-delete {
+  margin-left: 16px;
+  position: relative;
+}
+
+.row-actions .btn-delete::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background: var(--border);
 }
 
 .price-cell {
@@ -866,6 +955,168 @@ input.input-error {
   color: #9CA3AF;
 }
 
+/* ── Auth ─────────────────────────────────────────────────────── */
+.auth-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 200px);
+  padding: 20px 0;
+}
+
+.auth-card {
+  max-width: 380px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-brand .brand-logo {
+  margin: 0 auto 14px;
+  display: block;
+  border-radius: 10px;
+}
+
+.auth-brand h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+#login-error { margin-bottom: 6px; }
+
+/* ── Hub — stat tiles & bar chart ─────────────────────────────── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  position: relative;
+  padding-top: 22px;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--navy));
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+}
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  height: 220px;
+  padding: 20px 4px 0;
+  overflow-x: auto;
+}
+
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 48px;
+  flex: 1;
+  height: 100%;
+}
+
+.bar-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.bar {
+  width: 100%;
+  max-width: 44px;
+  min-height: 3px;
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  border-radius: 6px 6px 0 0;
+  transition: height 0.3s ease;
+}
+
+.bar-label {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.payment-breakdown {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.payment-breakdown-item {
+  flex: 1;
+  min-width: 140px;
+}
+
+.payment-breakdown-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  margin-bottom: 6px;
+}
+
+.payment-breakdown-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.payment-breakdown-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.payment-breakdown-bar-fill.cash { background: var(--navy); }
+.payment-breakdown-bar-fill.bank { background: var(--gold); }
+
 /* ── Toast ────────────────────────────────────────────────────── */
 #toast-container {
   position: fixed;
@@ -913,6 +1164,10 @@ input.input-error {
   .invoice-card-header { grid-template-columns: 1fr; }
   .invoice-card-total { text-align: left; }
   .cart-total-bar { flex-direction: column; gap: 8px; text-align: center; }
+  .header-right { gap: 10px; }
+  .user-email { display: none; }
+  .user-area { padding-left: 8px; gap: 4px; }
+  .card-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 480px) {

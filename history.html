@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="page-wrapper">
-    <header class="site-header">
+    <header class="site-header" id="site-header" style="display:none">
       <div class="header-inner">
         <div class="brand">
           <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
@@ -17,34 +17,65 @@
             <span class="short">YMDC</span>
           </div>
         </div>
-        <nav class="main-nav">
-          <a href="index.html" class="nav-link" data-page="pos">POS</a>
-          <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
-          <a href="history.html" class="nav-link active" data-page="history">History</a>
-        </nav>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link active" data-page="history">History</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
       </div>
     </header>
 
     <main class="main-content">
-      <h2 class="page-title">Invoice History</h2>
-
-      <div class="filter-bar card">
-        <div id="filter-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
-          Loading…
-        </div>
-        <div class="filter-bar-actions">
-          <button class="btn btn-primary btn-sm" id="btn-open-filter">Filter</button>
-          <button class="btn btn-gold btn-sm" id="btn-this-month">This Month</button>
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
         </div>
       </div>
 
-      <div id="history-container">
-        <div class="card loading">Loading history</div>
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Invoice History</h2>
+
+        <div class="filter-bar card">
+          <div id="filter-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
+            Loading…
+          </div>
+          <div class="filter-bar-actions">
+            <button class="btn btn-primary btn-sm" id="btn-open-filter">Filter</button>
+            <button class="btn btn-gold btn-sm" id="btn-this-month">This Month</button>
+          </div>
+        </div>
+
+        <div id="history-container">
+          <div class="card loading">Loading history</div>
+        </div>
       </div>
     </main>
 
     <footer class="site-footer">
-      Made by Meesum Mir · Yaseen Medical &amp; Diagnostic Centre · 2026
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
     </footer>
   </div>
 
@@ -328,7 +359,8 @@
     });
 
     activeFilters = defaultFilters();
-    loadHistory();
+    wireAuthGate();
+    initAuthGate(loadHistory);
   </script>
 </body>
 </html>

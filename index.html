@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="page-wrapper">
-    <header class="site-header">
+    <header class="site-header" id="site-header" style="display:none">
       <div class="header-inner">
         <div class="brand">
           <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
@@ -17,74 +17,105 @@
             <span class="short">YMDC</span>
           </div>
         </div>
-        <nav class="main-nav">
-          <a href="index.html" class="nav-link active" data-page="pos">POS</a>
-          <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
-          <a href="history.html" class="nav-link" data-page="history">History</a>
-        </nav>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link active" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
       </div>
     </header>
 
     <main class="main-content">
-      <h2 class="page-title">Point of Sale</h2>
-
-      <div class="card">
-        <div class="form-group">
-          <label for="search-input" class="form-label">Search Item</label>
-          <div class="search-wrapper">
-            <input type="text" id="search-input" class="input-lg input-search" placeholder="Search items…" autocomplete="off">
-            <div id="search-dropdown" class="search-dropdown"></div>
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
           </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:0">
-          <label for="patient-name" class="form-label">Patient Name <span style="color:var(--error)">*</span></label>
-          <input type="text" id="patient-name" class="input-lg" style="padding-left:16px" placeholder="Enter patient name" required>
-          <span class="field-error" id="patient-error">Patient name is required</span>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
         </div>
       </div>
 
-      <div class="card" id="cart-section" style="display:none">
-        <h3 class="card-title">Cart</h3>
-        <div class="table-wrapper">
-          <table id="cart-table" class="cart-table">
-            <thead>
-              <tr>
-                <th>Item Name</th>
-                <th>Qty</th>
-                <th class="num">Unit Price</th>
-                <th class="num">Line Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="cart-body"></tbody>
-          </table>
-        </div>
-        <div class="cart-total-bar">
-          <span>Grand Total</span>
-          <span class="total-amount" id="grand-total">PKR 0</span>
-        </div>
-        <div class="form-group" style="margin-top:16px;margin-bottom:0">
-          <label class="form-label">Payment Method</label>
-          <div class="preset-pills" id="payment-method-pills" style="margin-bottom:0">
-            <button type="button" class="preset-pill active" data-method="Cash">Cash</button>
-            <button type="button" class="preset-pill" data-method="Bank Transfer">Bank Transfer</button>
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Point of Sale</h2>
+
+        <div class="card">
+          <div class="form-group">
+            <label for="search-input" class="form-label">Search Item</label>
+            <div class="search-wrapper">
+              <input type="text" id="search-input" class="input-lg input-search" placeholder="Search items…" autocomplete="off">
+              <div id="search-dropdown" class="search-dropdown"></div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label for="patient-name" class="form-label">Patient Name <span style="color:var(--error)">*</span></label>
+            <input type="text" id="patient-name" class="input-lg" style="padding-left:16px" placeholder="Enter patient name" required>
+            <span class="field-error" id="patient-error">Patient name is required</span>
           </div>
         </div>
-        <div class="btn-group" style="margin-top:16px">
-          <button class="btn btn-primary" id="btn-save" disabled>Save Invoice</button>
-          <button class="btn btn-secondary" id="btn-clear-cart">Clear Cart</button>
-        </div>
-      </div>
 
-      <div id="empty-cart" class="card empty-state">
-        <div class="empty-state-icon">🛒</div>
-        <p>Search and select items above to start a sale.</p>
+        <div class="card" id="cart-section" style="display:none">
+          <h3 class="card-title">Cart</h3>
+          <div class="table-wrapper">
+            <table id="cart-table" class="cart-table">
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Qty</th>
+                  <th class="num">Unit Price</th>
+                  <th class="num">Line Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="cart-body"></tbody>
+            </table>
+          </div>
+          <div class="cart-total-bar">
+            <span>Grand Total</span>
+            <span class="total-amount" id="grand-total">PKR 0</span>
+          </div>
+          <div class="form-group" style="margin-top:16px;margin-bottom:0">
+            <label class="form-label">Payment Method</label>
+            <div class="preset-pills" id="payment-method-pills" style="margin-bottom:0">
+              <button type="button" class="preset-pill active" data-method="Cash">Cash</button>
+              <button type="button" class="preset-pill" data-method="Bank Transfer">Bank Transfer</button>
+            </div>
+          </div>
+          <div class="btn-group" style="margin-top:16px">
+            <button class="btn btn-primary" id="btn-save" disabled>Save Invoice</button>
+            <button class="btn btn-secondary" id="btn-clear-cart">Clear Cart</button>
+          </div>
+        </div>
+
+        <div id="empty-cart" class="card empty-state">
+          <div class="empty-state-icon">🛒</div>
+          <p>Search and select items above to start a sale.</p>
+        </div>
       </div>
     </main>
 
     <footer class="site-footer">
-      Made by Meesum Mir · Yaseen Medical &amp; Diagnostic Centre · 2026
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
     </footer>
   </div>
 
@@ -340,7 +371,8 @@
       }
     });
 
-    loadInventory();
+    wireAuthGate();
+    initAuthGate(loadInventory);
   </script>
 </body>
 </html>

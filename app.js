@@ -52,10 +52,10 @@ async function createSale(patientName, paymentMethod, cart) {
   return Array.isArray(data) ? data[0] : data;
 }
 
-async function restockItem(itemId, qtyToAdd) {
-  const { data, error } = await db.rpc('restock_item', {
+async function adjustQuantity(itemId, delta) {
+  const { data, error } = await db.rpc('adjust_quantity', {
     p_item_id: itemId,
-    p_qty_to_add: qtyToAdd,
+    p_delta: delta,
   });
   if (error) throw new Error(error.message);
   return Array.isArray(data) ? data[0] : data;
@@ -85,6 +85,12 @@ async function fetchHistory() {
   return data || [];
 }
 
+async function fetchInvoiceStats() {
+  const { data, error } = await db.from('invoices').select('total, sold_at, payment_method');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 function formatSoldAtDate(sold_at) {
   const d = new Date(sold_at);
   if (isNaN(d.getTime())) return '';
@@ -94,6 +100,91 @@ function formatSoldAtDate(sold_at) {
     month: '2-digit',
     year: 'numeric',
   }).format(d);
+}
+
+function soldAtMonthKey(sold_at) {
+  const [day, month, year] = formatSoldAtDate(sold_at).split('/');
+  if (!year) return 'Unknown';
+  return `${year}-${month}`;
+}
+
+// ── Auth ─────────────────────────────────────────────────────────
+let currentUser = null;
+let currentRole = null;
+
+async function initAuthGate(onReady) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) {
+    showLoginView();
+    return;
+  }
+  currentUser = session.user;
+  const { data: role } = await db.rpc('get_my_role');
+  currentRole = role || null;
+
+  const emailEl = document.getElementById('user-email');
+  if (emailEl) emailEl.textContent = currentUser.email;
+  applyRoleVisibility();
+
+  const header = document.getElementById('site-header');
+  const authView = document.getElementById('auth-view');
+  const pageContent = document.getElementById('page-content');
+  if (header) header.style.display = '';
+  if (authView) authView.style.display = 'none';
+  if (pageContent) pageContent.style.display = '';
+
+  onReady();
+}
+
+function applyRoleVisibility() {
+  const isAdmin = currentRole === 'admin';
+  document.querySelectorAll('[data-role="admin-only"]').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+}
+
+function showLoginView() {
+  const header = document.getElementById('site-header');
+  const authView = document.getElementById('auth-view');
+  const pageContent = document.getElementById('page-content');
+  if (header) header.style.display = 'none';
+  if (pageContent) pageContent.style.display = 'none';
+  if (authView) authView.style.display = '';
+}
+
+function wireAuthGate() {
+  const form = document.getElementById('login-form');
+  const errorEl = document.getElementById('login-error');
+  const submitBtn = document.getElementById('login-submit');
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.remove('visible');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in…';
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+        return;
+      }
+      location.reload();
+    });
+  }
+
+  const logoutLink = document.getElementById('logout-link');
+  if (logoutLink) {
+    logoutLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await db.auth.signOut();
+      location.reload();
+    });
+  }
 }
 
 function syncCartFromDOM(cartBody, cart) {
