@@ -41,12 +41,13 @@
               <tr>
                 <th>Item Name</th>
                 <th>Category</th>
+                <th class="num">Quantity (Units)</th>
                 <th class="num">Default Price</th>
-                <th style="width:100px">Actions</th>
+                <th style="width:140px">Actions</th>
               </tr>
             </thead>
             <tbody id="inventory-body">
-              <tr><td colspan="4" class="loading">Loading inventory</td></tr>
+              <tr><td colspan="5" class="loading">Loading inventory</td></tr>
             </tbody>
           </table>
         </div>
@@ -83,6 +84,11 @@
           <input type="number" id="item-price" min="0" step="1" value="0">
           <small style="color:var(--text-secondary);font-size:12px;margin-top:4px;display:block">Leave 0 if price is entered at sale</small>
         </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="item-quantity" class="form-label">Quantity (Units)</label>
+          <input type="number" id="item-quantity" min="0" step="1" value="0">
+          <small style="color:var(--text-secondary);font-size:12px;margin-top:4px;display:block">Manual correction — does not go through restock</small>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
@@ -91,6 +97,29 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="restock-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Restock Item</h3>
+        <button class="modal-close" id="restock-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="restock-id">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Item</label>
+          <p id="restock-item-name" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:16px"></p>
+          <label for="restock-qty" class="form-label">Quantity to Add</label>
+          <input type="number" id="restock-qty" min="1" step="1" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="restock-cancel">Cancel</button>
+        <button class="btn btn-primary" id="restock-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
@@ -104,17 +133,21 @@
     const itemName = document.getElementById('item-name');
     const itemCategory = document.getElementById('item-category');
     const itemPrice = document.getElementById('item-price');
+    const itemQuantity = document.getElementById('item-quantity');
+    const restockModal = document.getElementById('restock-modal');
+    const restockId = document.getElementById('restock-id');
+    const restockItemName = document.getElementById('restock-item-name');
+    const restockQty = document.getElementById('restock-qty');
 
     setActiveNav('inventory');
 
     async function loadInventory() {
-      inventoryBody.innerHTML = '<tr><td colspan="4" class="loading">Loading inventory</td></tr>';
+      inventoryBody.innerHTML = '<tr><td colspan="5" class="loading">Loading inventory</td></tr>';
       try {
-        const data = await apiGet('inventory');
-        allItems = data.items || [];
+        allItems = await fetchInventory();
         renderTable();
       } catch (err) {
-        inventoryBody.innerHTML = `<tr><td colspan="4" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+        inventoryBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
         showToast('Failed to load inventory: ' + err.message, 'error');
       }
     }
@@ -131,16 +164,18 @@
     function renderTable() {
       const items = getFiltered();
       if (!items.length) {
-        inventoryBody.innerHTML = '<tr><td colspan="4" class="empty-state">No items found.</td></tr>';
+        inventoryBody.innerHTML = '<tr><td colspan="5" class="empty-state">No items found.</td></tr>';
         return;
       }
       inventoryBody.innerHTML = items.map(item => `
         <tr data-id="${escapeHtml(item.id)}">
           <td><strong>${escapeHtml(item.name)}</strong></td>
           <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category)}</span></td>
+          <td class="num qty-cell">${(item.quantity || 0) === 0 ? `<span style="color:var(--error);font-weight:600">0</span>` : item.quantity}</td>
           <td class="num">${item.price ? formatPKR(item.price) : '—'}</td>
           <td>
             <div style="display:flex;gap:6px">
+              <button class="btn-icon-only btn-restock" title="Restock item">+</button>
               <button class="btn-icon-only btn-edit" title="Edit item">✎</button>
               <button class="btn-icon-only danger btn-delete" title="Delete item">🗑</button>
             </div>
@@ -155,12 +190,25 @@
       itemName.value = item ? item.name : '';
       itemCategory.value = item ? item.category : 'Medicine';
       itemPrice.value = item ? (item.price || 0) : 0;
+      itemQuantity.value = item ? (item.quantity || 0) : 0;
       itemModal.classList.add('open');
       itemName.focus();
     }
 
     function closeModal() {
       itemModal.classList.remove('open');
+    }
+
+    function openRestockModal(item) {
+      restockId.value = item.id;
+      restockItemName.textContent = item.name;
+      restockQty.value = 1;
+      restockModal.classList.add('open');
+      restockQty.focus();
+    }
+
+    function closeRestockModal() {
+      restockModal.classList.remove('open');
     }
 
     inventoryBody.addEventListener('click', async (e) => {
@@ -172,10 +220,12 @@
 
       if (e.target.closest('.btn-edit')) {
         openModal('edit', item);
+      } else if (e.target.closest('.btn-restock')) {
+        openRestockModal(item);
       } else if (e.target.closest('.btn-delete')) {
         if (!confirm(`Delete "${item.name}" from inventory?`)) return;
         try {
-          await apiPost({ action: 'inventory', operation: 'delete', id });
+          await deleteInventoryItem(id);
           showToast('Item deleted', 'success');
           await loadInventory();
         } catch (err) {
@@ -189,46 +239,48 @@
     document.getElementById('modal-cancel').addEventListener('click', closeModal);
     itemModal.addEventListener('click', (e) => { if (e.target === itemModal) closeModal(); });
 
+    document.getElementById('restock-modal-close').addEventListener('click', closeRestockModal);
+    document.getElementById('restock-cancel').addEventListener('click', closeRestockModal);
+    restockModal.addEventListener('click', (e) => { if (e.target === restockModal) closeRestockModal(); });
+
+    document.getElementById('restock-confirm').addEventListener('click', async () => {
+      const id = restockId.value;
+      const qtyToAdd = parseInt(restockQty.value, 10);
+      if (!id || !qtyToAdd || qtyToAdd < 1) {
+        showToast('Enter a valid quantity to add', 'warning');
+        return;
+      }
+      try {
+        const updated = await restockItem(id, qtyToAdd);
+        showToast('Item restocked', 'success');
+        closeRestockModal();
+        const item = allItems.find(i => i.id === id);
+        if (item && updated) item.quantity = updated.quantity;
+        else await loadInventory();
+        renderTable();
+      } catch (err) {
+        showToast('Restock failed: ' + err.message, 'error');
+      }
+    });
+
     document.getElementById('modal-save').addEventListener('click', async () => {
       const name = itemName.value.trim();
       if (!name) {
         showToast('Item name is required', 'warning');
         return;
       }
-      const payload = {
-        action: 'inventory',
-        operation: editId.value ? 'edit' : 'add',
-        id: editId.value || undefined,
+      const fields = {
         name,
         category: itemCategory.value,
         price: Number(parseFloat(itemPrice.value)) || 0,
+        quantity: Math.max(0, parseInt(itemQuantity.value, 10) || 0),
       };
-      console.log('Inventory save payload:', {
-        action: { type: typeof payload.action, value: payload.action },
-        operation: { type: typeof payload.operation, value: payload.operation },
-        id: { type: typeof payload.id, value: payload.id },
-        name: { type: typeof payload.name, value: payload.name },
-        category: { type: typeof payload.category, value: payload.category },
-        price: { type: typeof payload.price, value: payload.price },
-      });
       try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload),
-        });
-        const text = await res.text();
-        console.log('Inventory save server response:', res.status, text);
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          console.error('Inventory save non-JSON response:', text);
-          throw new Error(`Invalid server response (${res.status}): ${text.slice(0, 200)}`);
+        if (editId.value) {
+          await updateInventoryItem(editId.value, fields);
+        } else {
+          await addInventoryItem(fields);
         }
-        if (!res.ok) throw new Error(data.message || data.error || `Server error (${res.status})`);
-        if (data.status === 'error') throw new Error(data.message || data.error || 'Server error');
-        if (data.error) throw new Error(data.message || data.error);
         showToast(editId.value ? 'Item updated' : 'Item added', 'success');
         closeModal();
         await loadInventory();

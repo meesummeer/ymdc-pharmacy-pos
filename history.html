@@ -106,6 +106,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
@@ -127,15 +128,6 @@
         categories: [...ALL_CATEGORIES],
         itemSearch: '',
       };
-    }
-
-    function normalizeInvoices(data) {
-      if (Array.isArray(data.invoices) && data.invoices.length) return data.invoices;
-      if (Array.isArray(data.days)) {
-        const fromDays = data.days.flatMap(day => day.invoices || []);
-        if (fromDays.length) return fromDays;
-      }
-      return [];
     }
 
     function getSelectedCategories() {
@@ -170,7 +162,7 @@
     }
 
     function applyInvoiceItemFilters(invoice) {
-      let items = (invoice.items || []).slice();
+      let items = (invoice.sale_items || []).slice();
       const cats = activeFilters.categories;
 
       if (cats.length && cats.length < ALL_CATEGORIES.length) {
@@ -179,25 +171,19 @@
 
       if (activeFilters.itemSearch) {
         const q = activeFilters.itemSearch.toLowerCase();
-        items = items.filter(item => {
-          const name = (item.name || item.itemName || '').toLowerCase();
-          return name.includes(q);
-        });
+        items = items.filter(item => (item.item_name || '').toLowerCase().includes(q));
       }
 
       if (!items.length) return null;
 
-      const total = items.reduce((sum, item) => {
-        const price = item.price != null ? item.price : item.unitPrice || 0;
-        return sum + (item.qty || 0) * price;
-      }, 0);
+      const total = items.reduce((sum, item) => sum + (item.qty || 0) * (item.unit_price || 0), 0);
 
       return { ...invoice, items, total };
     }
 
     function getFilteredInvoices() {
       return allInvoices
-        .filter(inv => dateInRange(inv.date, activeFilters.from, activeFilters.to))
+        .filter(inv => dateInRange(formatSoldAtDate(inv.sold_at), activeFilters.from, activeFilters.to))
         .map(inv => applyInvoiceItemFilters(inv))
         .filter(Boolean);
     }
@@ -209,8 +195,7 @@
     async function loadHistory() {
       historyContainer.innerHTML = '<div class="card loading">Loading history</div>';
       try {
-        const data = await apiGet('history');
-        allInvoices = normalizeInvoices(data);
+        allInvoices = await fetchHistory();
         renderHistory();
       } catch (err) {
         historyContainer.innerHTML = `<div class="card empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
@@ -219,18 +204,19 @@
     }
 
     function renderInvoiceCard(inv) {
-      const isExpanded = expandedInvoice === inv.invoiceNo;
+      const isExpanded = expandedInvoice === inv.invoice_no;
       const items = inv.items || [];
-      const timeDisplay = formatTimeDisplay(inv.time);
+      const timeDisplay = formatTimeDisplay(inv.sold_at);
 
       return `
-        <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoiceNo)}">
+        <div class="invoice-card${isExpanded ? ' expanded' : ''}" data-invoice="${escapeHtml(inv.invoice_no)}">
           <div class="invoice-card-header">
             <div class="invoice-card-top">
-              <span class="invoice-card-no">${escapeHtml(inv.invoiceNo)} ${isExpanded ? '▾' : '▸'}</span>
-              <span class="invoice-card-field"><strong>Date:</strong> ${formatDate(inv.date)}</span>
+              <span class="invoice-card-no">${escapeHtml(inv.invoice_no)} ${isExpanded ? '▾' : '▸'}</span>
+              <span class="invoice-card-field"><strong>Date:</strong> ${formatSoldAtDate(inv.sold_at)}</span>
               <span class="invoice-card-field"><strong>Time:</strong> ${escapeHtml(timeDisplay)}</span>
-              <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patientName ? escapeHtml(inv.patientName) : '—'}</span>
+              <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patient_name ? escapeHtml(inv.patient_name) : '—'}</span>
+              <span class="pill pill-other">${escapeHtml(inv.payment_method || '—')}</span>
             </div>
             <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
           </div>
@@ -248,10 +234,10 @@
                 <tbody>
                   ${items.map(item => `
                     <tr>
-                      <td>${escapeHtml(item.name || item.itemName || '—')}</td>
+                      <td>${escapeHtml(item.item_name || '—')}</td>
                       <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category || '—')}</span></td>
                       <td class="num">${item.qty || 0}</td>
-                      <td class="num">${formatPKR(item.price != null ? item.price : item.unitPrice || 0)}</td>
+                      <td class="num">${formatPKR(item.unit_price || 0)}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -277,15 +263,7 @@
         return;
       }
 
-      filtered.sort((a, b) => {
-        const da = parseDMYParts(formatDate(a.date));
-        const db = parseDMYParts(formatDate(b.date));
-        if (da && db) {
-          const diff = dmyToNumber(db) - dmyToNumber(da);
-          if (diff !== 0) return diff;
-        }
-        return formatTimeDisplay(b.time).localeCompare(formatTimeDisplay(a.time));
-      });
+      filtered.sort((a, b) => new Date(b.sold_at) - new Date(a.sold_at));
 
       historyContainer.innerHTML = filtered.map(inv => renderInvoiceCard(inv)).join('');
     }

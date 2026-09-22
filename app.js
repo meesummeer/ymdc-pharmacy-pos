@@ -24,95 +24,76 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// ── API helpers ──────────────────────────────────────────────────
-async function apiGet(action, isRetry) {
-  const url = `${API_URL}?action=${encodeURIComponent(action)}`;
-  try {
-    const res = await fetch(url);
-    const text = await res.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (parseErr) {
-      console.error('API GET non-JSON response:', action, text.slice(0, 200));
-      if (!isRetry) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return apiGet(action, true);
-      }
-      throw new Error(`Invalid server response (${res.status})`);
-    }
-    if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
-    if (data.error) throw new Error(data.error);
-    return data;
-  } catch (err) {
-    console.error('API GET failed:', action, err);
-    if (err.message === 'Failed to fetch') {
-      throw new Error('Network error — check connection and Apps Script URL in config.js');
-    }
-    throw err;
-  }
+// ── Supabase data helpers ──────────────────────────────────────────
+async function fetchInventory() {
+  const { data, error } = await db
+    .from('inventory')
+    .select('*')
+    .eq('active', true)
+    .order('name');
+  if (error) throw new Error(error.message);
+  return data || [];
 }
 
-async function apiPost(body) {
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-    });
-    const text = await res.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (parseErr) {
-      console.error('API POST non-JSON response:', body.action, text.slice(0, 200));
-      throw new Error(`Invalid server response (${res.status})`);
-    }
-    if (!res.ok) throw new Error(data.message || data.error || `Server error (${res.status})`);
-    if (data.status === 'error') throw new Error(data.message || data.error || 'Server error');
-    if (data.error) throw new Error(data.message || data.error);
-    return data;
-  } catch (err) {
-    console.error('API POST failed:', body.action, body, err);
-    if (err.message === 'Failed to fetch') {
-      throw new Error('Network error — check connection and Apps Script URL in config.js');
-    }
-    throw err;
-  }
+async function createSale(patientName, paymentMethod, cart) {
+  const p_items = cart.map(item => ({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    qty: Number(item.qty) || 1,
+    price: Number(item.price) || 0,
+  }));
+  const { data, error } = await db.rpc('create_sale', {
+    p_patient_name: String(patientName || '').trim(),
+    p_payment_method: paymentMethod,
+    p_items,
+  });
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
 }
 
-// ── Sale payload builder ─────────────────────────────────────────
-function captureTimestamp() {
-  const now = new Date();
-  const date = new Intl.DateTimeFormat('en-GB', {
+async function restockItem(itemId, qtyToAdd) {
+  const { data, error } = await db.rpc('restock_item', {
+    p_item_id: itemId,
+    p_qty_to_add: qtyToAdd,
+  });
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function addInventoryItem(fields) {
+  const { error } = await db.from('inventory').insert(fields);
+  if (error) throw new Error(error.message);
+}
+
+async function updateInventoryItem(id, fields) {
+  const { error } = await db.from('inventory').update(fields).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteInventoryItem(id) {
+  const { error } = await db.from('inventory').update({ active: false }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+async function fetchHistory() {
+  const { data, error } = await db
+    .from('invoices')
+    .select('*, sale_items(*)')
+    .order('sold_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+function formatSoldAtDate(sold_at) {
+  const d = new Date(sold_at);
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Karachi',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(now);
-  const time = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Karachi',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(now);
-  return { date, time };
-}
-
-function buildSaleData(cart, patientName) {
-  const { date, time } = captureTimestamp();
-  return {
-    action: 'sale',
-    patientName: String(patientName || '').trim(),
-    date,
-    time,
-    items: cart.map(item => ({
-      name: String(item.name || ''),
-      category: String(item.category || ''),
-      qty: Number(item.qty) || 1,
-      price: Number(item.price) || 0,
-    })),
-  };
+  }).format(d);
 }
 
 function syncCartFromDOM(cartBody, cart) {

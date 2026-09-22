@@ -1,1 +1,3 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyYfYeYuDo2Wsg5-db80LIW8nsDQnjiFSg79Dw1712I8gg469-1-Ojl84hsejmTHYXrBA/exec";
+const SUPABASE_URL = "https://uuyuzkfxwqlyjjlgwdwl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1eXV6a2Z4d3FseWpqbGd3ZHdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNzk2ODAsImV4cCI6MjEwNTY1NTY4MH0.KPaEZgORogMyujSPLG5bwgXS4OTomOOrYwlvUGO1QqU";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

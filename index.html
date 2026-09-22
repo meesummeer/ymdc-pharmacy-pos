@@ -64,6 +64,13 @@
           <span>Grand Total</span>
           <span class="total-amount" id="grand-total">PKR 0</span>
         </div>
+        <div class="form-group" style="margin-top:16px;margin-bottom:0">
+          <label class="form-label">Payment Method</label>
+          <div class="preset-pills" id="payment-method-pills" style="margin-bottom:0">
+            <button type="button" class="preset-pill active" data-method="Cash">Cash</button>
+            <button type="button" class="preset-pill" data-method="Bank Transfer">Bank Transfer</button>
+          </div>
+        </div>
         <div class="btn-group" style="margin-top:16px">
           <button class="btn btn-primary" id="btn-save" disabled>Save Invoice</button>
           <button class="btn btn-secondary" id="btn-clear-cart">Clear Cart</button>
@@ -81,12 +88,14 @@
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
     let inventory = [];
     let cart = [];
     let highlightIndex = -1;
+    let paymentMethod = 'Cash';
 
     const searchInput = document.getElementById('search-input');
     const searchDropdown = document.getElementById('search-dropdown');
@@ -103,8 +112,7 @@
 
     async function loadInventory() {
       try {
-        const data = await apiGet('inventory');
-        inventory = data.items || [];
+        inventory = await fetchInventory();
       } catch (err) {
         showToast('Failed to load inventory: ' + err.message, 'error');
         inventory = [];
@@ -287,6 +295,14 @@
       }
     });
 
+    document.getElementById('payment-method-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      paymentMethod = pill.dataset.method;
+      document.querySelectorAll('#payment-method-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
     patientInput.addEventListener('input', () => {
       patientInput.classList.remove('input-error');
       patientError.classList.remove('visible');
@@ -306,17 +322,16 @@
       btnSave.disabled = true;
       btnSave.textContent = 'Saving…';
       syncCartFromDOM(cartBody, cart);
-      const saleData = buildSaleData(cart, patientName);
-      console.log('SENDING:', JSON.stringify(saleData));
 
       try {
-        const result = await apiPost(saleData);
-        showToast('Invoice saved — ' + result.invoiceNo, 'success');
+        const result = await createSale(patientName, paymentMethod, cart);
+        showToast('Invoice saved' + (result && result.invoice_no ? ' — ' + result.invoice_no : ''), 'success');
         cart = [];
         patientInput.value = '';
         patientInput.classList.remove('input-error');
         patientError.classList.remove('visible');
         renderCart();
+        await loadInventory();
       } catch (err) {
         showToast('Save failed: ' + err.message, 'error');
         btnSave.disabled = false;
