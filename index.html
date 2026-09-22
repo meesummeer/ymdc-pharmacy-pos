@@ -94,7 +94,11 @@
             <span>Grand Total</span>
             <span class="total-amount" id="grand-total">PKR 0</span>
           </div>
-          <div class="form-group" style="margin-top:16px;margin-bottom:0">
+          <div class="form-group" style="margin-top:16px">
+            <label for="sale-date" class="form-label">Sale Date</label>
+            <input type="date" id="sale-date" class="input-lg" style="padding-left:16px">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Payment Method</label>
             <div class="preset-pills" id="payment-method-pills" style="margin-bottom:0">
               <button type="button" class="preset-pill active" data-method="Cash">Cash</button>
@@ -138,8 +142,26 @@
     const btnClearCart = document.getElementById('btn-clear-cart');
     const patientInput = document.getElementById('patient-name');
     const patientError = document.getElementById('patient-error');
+    const saleDateInput = document.getElementById('sale-date');
 
     setActiveNav('pos');
+
+    function todayInputValue() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function buildSoldAt(dateInputValue) {
+      const [year, month, day] = dateInputValue.split('-').map(Number);
+      const now = new Date();
+      const combined = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      return combined.toISOString();
+    }
+
+    saleDateInput.value = todayInputValue();
 
     async function loadInventory() {
       try {
@@ -355,12 +377,14 @@
       syncCartFromDOM(cartBody, cart);
 
       try {
-        const result = await createSale(patientName, paymentMethod, cart);
+        const soldAt = buildSoldAt(saleDateInput.value || todayInputValue());
+        const result = await createSale(patientName, paymentMethod, cart, soldAt);
         showToast('Invoice saved' + (result && result.invoice_no ? ' — ' + result.invoice_no : ''), 'success');
         cart = [];
         patientInput.value = '';
         patientInput.classList.remove('input-error');
         patientError.classList.remove('visible');
+        saleDateInput.value = todayInputValue();
         renderCart();
         await loadInventory();
       } catch (err) {

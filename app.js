@@ -35,7 +35,7 @@ async function fetchInventory() {
   return data || [];
 }
 
-async function createSale(patientName, paymentMethod, cart) {
+async function createSale(patientName, paymentMethod, cart, soldAt) {
   const p_items = cart.map(item => ({
     id: item.id,
     name: item.name,
@@ -47,6 +47,7 @@ async function createSale(patientName, paymentMethod, cart) {
     p_patient_name: String(patientName || '').trim(),
     p_payment_method: paymentMethod,
     p_items,
+    p_sold_at: soldAt,
   });
   if (error) throw new Error(error.message);
   return Array.isArray(data) ? data[0] : data;
@@ -91,9 +92,15 @@ async function deleteInvoice(id) {
 }
 
 async function fetchInvoiceStats() {
-  const { data, error } = await db.from('invoices').select('total, sold_at, payment_method');
+  const { data, error } = await db
+    .from('invoices')
+    .select('sold_at, payment_method, sale_items(qty, unit_price)');
   if (error) throw new Error(error.message);
-  return data || [];
+  return (data || []).map(inv => ({
+    sold_at: inv.sold_at,
+    payment_method: inv.payment_method,
+    total: (inv.sale_items || []).reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0),
+  }));
 }
 
 function formatSoldAtDate(sold_at) {
