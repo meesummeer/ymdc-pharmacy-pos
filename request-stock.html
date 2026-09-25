@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Stock — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link active" data-page="request-stock">Request Stock</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Request Stock</h2>
+
+        <div class="card">
+          <h3 class="card-title">Add to Request List</h3>
+          <div class="form-group">
+            <label for="request-search-input" class="form-label">Search Existing Item</label>
+            <div class="search-wrapper">
+              <input type="text" id="request-search-input" class="input-lg input-search" placeholder="Search inventory…" autocomplete="off">
+              <div id="request-search-dropdown" class="search-dropdown"></div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="request-freehand-input" class="form-label">Or Type an Item Name</label>
+            <div style="display:flex;gap:10px">
+              <input type="text" id="request-freehand-input" placeholder="e.g. Panadol Extra" style="flex:1">
+              <button class="btn btn-primary" id="btn-request-add">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Requested By</th>
+                  <th>Requested</th>
+                  <th>Status</th>
+                  <th style="width:150px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="request-body">
+                <tr><td colspan="5" class="loading">Loading requests</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    let allRequests = [];
+    let inventoryForSearch = [];
+    let highlightIndex = -1;
+
+    const requestBody = document.getElementById('request-body');
+    const searchInput = document.getElementById('request-search-input');
+    const searchDropdown = document.getElementById('request-search-dropdown');
+    const freehandInput = document.getElementById('request-freehand-input');
+
+    setActiveNav('request-stock');
+
+    function sortRequests(rows) {
+      return rows.slice().sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+        return new Date(b.requested_at) - new Date(a.requested_at);
+      });
+    }
+
+    function renderRequestRow(req) {
+      const isAdmin = currentRole === 'admin';
+      const isFulfilled = req.status === 'fulfilled';
+      return `
+        <tr data-id="${escapeHtml(req.id)}">
+          <td><strong>${escapeHtml(req.item_name)}</strong></td>
+          <td>${escapeHtml(req.requested_by || '—')}</td>
+          <td>${formatSoldAtDate(req.requested_at)} · ${escapeHtml(formatTimeDisplay(req.requested_at))}</td>
+          <td>
+            <span class="pill pill-${isFulfilled ? 'fulfilled' : 'pending'}">${isFulfilled ? 'Fulfilled' : 'Pending'}</span>
+            ${isFulfilled && req.fulfilled_at ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">on ${formatSoldAtDate(req.fulfilled_at)}</div>` : ''}
+          </td>
+          <td>${(isAdmin && !isFulfilled) ? `<button class="btn btn-secondary btn-sm btn-fulfill" data-id="${escapeHtml(req.id)}">Mark Fulfilled</button>` : ''}</td>
+        </tr>
+      `;
+    }
+
+    function renderRequests() {
+      if (!allRequests.length) {
+        requestBody.innerHTML = '<tr><td colspan="5" class="empty-state">No stock requests yet.</td></tr>';
+        return;
+      }
+      requestBody.innerHTML = sortRequests(allRequests).map(renderRequestRow).join('');
+    }
+
+    async function loadRequests() {
+      requestBody.innerHTML = '<tr><td colspan="5" class="loading">Loading requests</td></tr>';
+      try {
+        const [requests, inv] = await Promise.all([fetchRequestStock(), fetchInventory()]);
+        allRequests = requests;
+        inventoryForSearch = inv;
+        renderRequests();
+      } catch (err) {
+        requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+        showToast('Failed to load requests: ' + err.message, 'error');
+      }
+    }
+
+    async function submitRequest({ item_name, item_id }) {
+      if (item_id) {
+        const already = await hasPendingRequest(item_id);
+        if (already) {
+          showToast('Already on the request list', 'warning');
+          return false;
+        }
+      }
+      await addRequestStock({ item_name, item_id: item_id || null, requested_by: currentUser.email });
+      return true;
+    }
+
+    document.getElementById('btn-request-add').addEventListener('click', async () => {
+      const name = freehandInput.value.trim();
+      if (!name) {
+        showToast('Enter an item name', 'warning');
+        return;
+      }
+      try {
+        const added = await submitRequest({ item_name: name, item_id: null });
+        if (added) {
+          showToast('Added to request list', 'success');
+          freehandInput.value = '';
+          await loadRequests();
+        }
+      } catch (err) {
+        showToast('Failed to add: ' + err.message, 'error');
+      }
+    });
+
+    function getFilteredSearchItems(query) {
+      if (!query) return [];
+      const q = query.toLowerCase();
+      return inventoryForSearch.filter(item => item.name.toLowerCase().includes(q)).slice(0, 20);
+    }
+
+    function renderSearchDropdown(items) {
+      if (!items.length) {
+        searchDropdown.classList.remove('open');
+        return;
+      }
+      searchDropdown.innerHTML = items.map((item, i) => `
+        <div class="search-dropdown-item${i === highlightIndex ? ' highlighted' : ''}"
+             data-id="${item.id}" data-index="${i}">
+          <span>${escapeHtml(item.name)}</span>
+          <span class="cat-badge ${categoryClass(item.category)}">${escapeHtml(item.category)}</span>
+        </div>
+      `).join('');
+      searchDropdown.classList.add('open');
+    }
+
+    async function selectSearchItem(item) {
+      searchInput.value = '';
+      searchDropdown.classList.remove('open');
+      highlightIndex = -1;
+      try {
+        const added = await submitRequest({ item_name: item.name, item_id: item.id });
+        if (added) {
+          showToast('Added to request list', 'success');
+          await loadRequests();
+        }
+      } catch (err) {
+        showToast('Failed to add: ' + err.message, 'error');
+      }
+    }
+
+    searchInput.addEventListener('input', () => {
+      highlightIndex = -1;
+      renderSearchDropdown(getFilteredSearchItems(searchInput.value.trim()));
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      const items = getFilteredSearchItems(searchInput.value.trim());
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightIndex = Math.min(highlightIndex + 1, items.length - 1);
+        renderSearchDropdown(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightIndex = Math.max(highlightIndex - 1, 0);
+        renderSearchDropdown(items);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectSearchItem(items[highlightIndex >= 0 ? highlightIndex : 0]);
+      } else if (e.key === 'Escape') {
+        searchDropdown.classList.remove('open');
+      }
+    });
+
+    searchDropdown.addEventListener('click', (e) => {
+      const el = e.target.closest('.search-dropdown-item');
+      if (!el) return;
+      const item = inventoryForSearch.find(i => i.id === el.dataset.id);
+      if (item) selectSearchItem(item);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrapper')) searchDropdown.classList.remove('open');
+    });
+
+    requestBody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.btn-fulfill');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      try {
+        await fulfillRequest(id);
+        showToast('Marked as fulfilled', 'success');
+        await loadRequests();
+      } catch (err) {
+        showToast('Failed to update: ' + err.message, 'error');
+      }
+    });
+
+    wireAuthGate();
+    initAuthGate(loadRequests);
+  </script>
+</body>
+</html>

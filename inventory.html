@@ -22,6 +22,7 @@
             <a href="index.html" class="nav-link" data-page="pos">POS</a>
             <a href="inventory.html" class="nav-link active" data-page="inventory">Inventory</a>
             <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
           </nav>
           <div class="user-area">
@@ -60,6 +61,8 @@
           <h2 class="page-title">Inventory Management</h2>
           <button class="btn btn-primary" id="btn-add-item">+ Add Item</button>
         </div>
+
+        <div id="low-stock-banner" class="low-stock-banner" style="display:none"></div>
 
         <div class="card" style="padding:0;overflow:hidden">
           <div style="padding:20px 24px 12px">
@@ -132,10 +135,13 @@
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
+    const LOW_STOCK_THRESHOLD = 5;
+
     let allItems = [];
     let filterText = '';
 
     const inventoryBody = document.getElementById('inventory-body');
+    const lowStockBanner = document.getElementById('low-stock-banner');
     const itemModal = document.getElementById('item-modal');
     const modalTitle = document.getElementById('modal-title');
     const editId = document.getElementById('edit-id');
@@ -166,7 +172,22 @@
       );
     }
 
+    function renderLowStockBanner() {
+      const lowItems = allItems.filter(item => (item.quantity || 0) <= LOW_STOCK_THRESHOLD);
+      if (!lowItems.length) {
+        lowStockBanner.style.display = 'none';
+        lowStockBanner.innerHTML = '';
+        return;
+      }
+      const shown = lowItems.slice(0, 5);
+      const remainder = lowItems.length - shown.length;
+      const namesText = shown.map(item => `${escapeHtml(item.name)} (${item.quantity || 0})`).join(', ');
+      lowStockBanner.innerHTML = `⚠ <strong>${lowItems.length}</strong> item${lowItems.length !== 1 ? 's' : ''} low in stock: ${namesText}${remainder > 0 ? ` and ${remainder} more` : ''}`;
+      lowStockBanner.style.display = 'block';
+    }
+
     function renderTable() {
+      renderLowStockBanner();
       const items = getFiltered();
       if (!items.length) {
         inventoryBody.innerHTML = '<tr><td colspan="5" class="empty-state">No items found.</td></tr>';
@@ -176,6 +197,7 @@
       const isPharmacist = currentRole === 'pharmacist';
       inventoryBody.innerHTML = items.map(item => {
         const qty = item.quantity || 0;
+        const isLowStock = qty <= LOW_STOCK_THRESHOLD;
         return `
         <tr data-id="${escapeHtml(item.id)}">
           <td><strong>${escapeHtml(item.name)}</strong></td>
@@ -190,6 +212,7 @@
           <td class="num">${item.price ? formatPKR(item.price) : '—'}</td>
           <td>
             <div class="row-actions">
+              ${isLowStock ? `<button class="btn-icon-only btn-flag-low-stock" data-id="${escapeHtml(item.id)}" title="Add to Request Stock">🔔</button>` : ''}
               ${(isAdmin || isPharmacist) ? `<button class="btn-icon-only btn-edit" title="${isAdmin ? 'Edit item' : 'Edit price'}">✎</button>` : ''}
               ${isAdmin ? `<button class="btn-icon-only danger btn-delete" title="Delete item">🗑</button>` : ''}
             </div>
@@ -221,6 +244,25 @@
     }
 
     inventoryBody.addEventListener('click', async (e) => {
+      const flagBtn = e.target.closest('.btn-flag-low-stock');
+      if (flagBtn) {
+        const id = flagBtn.dataset.id;
+        const item = allItems.find(i => i.id === id);
+        if (!item) return;
+        try {
+          const already = await hasPendingRequest(id);
+          if (already) {
+            showToast('Already on the request list', 'warning');
+            return;
+          }
+          await addRequestStock({ item_name: item.name, item_id: id, requested_by: currentUser.email });
+          showToast('Added to Request Stock list', 'success');
+        } catch (err) {
+          showToast('Failed to add request: ' + err.message, 'error');
+        }
+        return;
+      }
+
       const adjustBtn = e.target.closest('[data-adjust]');
       if (adjustBtn) {
         const id = adjustBtn.dataset.id;

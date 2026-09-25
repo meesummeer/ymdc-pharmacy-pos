@@ -22,6 +22,7 @@
             <a href="index.html" class="nav-link" data-page="pos">POS</a>
             <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
             <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link active" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
           </nav>
           <div class="user-area">
@@ -67,6 +68,10 @@
           </div>
         </div>
 
+        <div class="profit-banner" id="profit-banner">
+          Estimated Profit (13% margin): <strong id="profit-value">PKR 0</strong>
+        </div>
+
         <div class="card-grid">
           <div class="card stat-card">
             <span class="stat-label">Total Invoices</span>
@@ -86,9 +91,16 @@
           </div>
         </div>
 
-        <div class="card">
-          <h3 class="card-title">Revenue by Month</h3>
-          <div id="revenue-chart-wrap"></div>
+        <div class="chart-row">
+          <div class="card">
+            <h3 class="card-title">Revenue by Month <span class="card-title-hint">(all time)</span></h3>
+            <div id="revenue-chart-wrap"></div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">Revenue by Category</h3>
+            <div id="category-pie-wrap"></div>
+          </div>
         </div>
 
         <div class="card">
@@ -141,8 +153,15 @@
     setActiveNav('hub');
 
     const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const PROFIT_MARGIN = 0.13;
+    const CATEGORY_COLORS = {
+      Medicine: '#1D4ED8',
+      Snack: '#047857',
+      Other: '#6B7280',
+    };
 
     let allHubInvoices = [];
+    let allCategorySaleItems = [];
     let hubDateFrom = '';
     let hubDateTo = '';
 
@@ -152,6 +171,15 @@
       const [year, month] = key.split('-');
       const idx = parseInt(month, 10) - 1;
       return `${MONTH_NAMES[idx] || month} ${year}`;
+    }
+
+    function currentMonthKey() {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit',
+      }).formatToParts(new Date());
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      return `${year}-${month}`;
     }
 
     function formatRangeLabel(from, to) {
@@ -191,22 +219,92 @@
 
       const months = Object.keys(byMonth).sort();
       const maxRevenue = Math.max(...months.map(m => byMonth[m]), 1);
+      const curKey = currentMonthKey();
 
       wrap.innerHTML = `
         <div class="bar-chart">
           ${months.map(m => {
             const value = byMonth[m];
             const heightPct = Math.max(4, Math.round((value / maxRevenue) * 100));
+            const isCurrent = m === curKey;
             return `
-              <div class="bar-col">
+              <div class="bar-col${isCurrent ? ' bar-col-current' : ''}">
                 <div class="bar-value">${formatPKR(value)}</div>
-                <div class="bar" style="height:${heightPct}%"></div>
+                <div class="bar${isCurrent ? ' bar-current' : ''}" style="height:${heightPct}%"></div>
                 <div class="bar-label">${escapeHtml(monthKeyToLabel(m))}</div>
               </div>
             `;
           }).join('')}
         </div>
       `;
+    }
+
+    function renderCategoryPie(totals) {
+      const wrap = document.getElementById('category-pie-wrap');
+      const entries = Object.entries(totals).filter(([, v]) => v > 0);
+      const total = entries.reduce((sum, [, v]) => sum + v, 0);
+      if (!entries.length || total <= 0) {
+        renderEmptyChart(wrap, 'No category data for this range.');
+        return;
+      }
+
+      const cx = 90, cy = 90, r = 80;
+
+      let svgBody;
+      if (entries.length === 1) {
+        const [cat] = entries[0];
+        const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+        svgBody = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"></circle>`;
+      } else {
+        let angleStart = -90;
+        svgBody = entries.map(([cat, value]) => {
+          const pct = value / total;
+          const angleEnd = angleStart + pct * 360;
+          const largeArc = (angleEnd - angleStart) > 180 ? 1 : 0;
+          const startRad = (Math.PI / 180) * angleStart;
+          const endRad = (Math.PI / 180) * angleEnd;
+          const x1 = (cx + r * Math.cos(startRad)).toFixed(2);
+          const y1 = (cy + r * Math.sin(startRad)).toFixed(2);
+          const x2 = (cx + r * Math.cos(endRad)).toFixed(2);
+          const y2 = (cy + r * Math.sin(endRad)).toFixed(2);
+          const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+          const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+          angleStart = angleEnd;
+          return `<path d="${path}" fill="${color}" stroke="#fff" stroke-width="1.5"></path>`;
+        }).join('');
+      }
+
+      const legend = entries.map(([cat, value]) => {
+        const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+        const pct = Math.round((value / total) * 100);
+        return `
+          <div class="pie-legend-item">
+            <span class="pie-legend-swatch" style="background:${color}"></span>
+            <span class="pie-legend-label">${escapeHtml(cat)}</span>
+            <span class="pie-legend-value">${formatPKR(value)} (${pct}%)</span>
+          </div>
+        `;
+      }).join('');
+
+      wrap.innerHTML = `
+        <div class="pie-chart-row">
+          <svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Revenue by category">${svgBody}</svg>
+          <div class="pie-legend">${legend}</div>
+        </div>
+      `;
+    }
+
+    function getCategoryRevenue() {
+      const totals = {};
+      allCategorySaleItems.forEach(row => {
+        const soldAt = row.invoices && row.invoices.sold_at;
+        if (!soldAt) return;
+        if (!dateInRange(formatSoldAtDate(soldAt), hubDateFrom, hubDateTo)) return;
+        const cat = row.category || 'Other';
+        const amount = (Number(row.qty) || 0) * (Number(row.unit_price) || 0);
+        totals[cat] = (totals[cat] || 0) + amount;
+      });
+      return totals;
     }
 
     function renderPaymentBreakdown(invoices) {
@@ -250,8 +348,10 @@
       document.getElementById('stat-bank').textContent = formatPKR(
         invoices.filter(inv => inv.payment_method === 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
       );
+      document.getElementById('profit-value').textContent = formatPKR(totalRevenue * PROFIT_MARGIN);
       document.getElementById('hub-range-summary').textContent = formatRangeLabel(hubDateFrom, hubDateTo);
-      renderRevenueChart(invoices);
+      renderRevenueChart(allHubInvoices);
+      renderCategoryPie(getCategoryRevenue());
       renderPaymentBreakdown(invoices);
     }
 
@@ -261,7 +361,12 @@
         return;
       }
       try {
-        allHubInvoices = await fetchInvoiceStats();
+        const [invoices, categorySaleItems] = await Promise.all([
+          fetchInvoiceStats(),
+          fetchCategorySaleItems(),
+        ]);
+        allHubInvoices = invoices;
+        allCategorySaleItems = categorySaleItems;
         const range = getCurrentMonthRange();
         hubDateFrom = range.from;
         hubDateTo = range.to;

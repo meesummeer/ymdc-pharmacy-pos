@@ -117,6 +117,42 @@ async function fetchInvoiceStats() {
   }));
 }
 
+async function fetchCategorySaleItems() {
+  return fetchAllPages(() =>
+    db.from('sale_items').select('category, qty, unit_price, invoices(sold_at)')
+  );
+}
+
+async function fetchRequestStock() {
+  return fetchAllPages(() =>
+    db.from('request_stock').select('*').order('requested_at', { ascending: false })
+  );
+}
+
+async function hasPendingRequest(itemId) {
+  const { data, error } = await db
+    .from('request_stock')
+    .select('id')
+    .eq('item_id', itemId)
+    .eq('status', 'pending')
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return !!(data && data.length);
+}
+
+async function addRequestStock(fields) {
+  const { error } = await db.from('request_stock').insert(fields);
+  if (error) throw new Error(error.message);
+}
+
+async function fulfillRequest(id) {
+  const { error } = await db
+    .from('request_stock')
+    .update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 function formatSoldAtDate(sold_at) {
   const d = new Date(sold_at);
   if (isNaN(d.getTime())) return '';
