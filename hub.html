@@ -107,6 +107,32 @@
           <h3 class="card-title">Payment Method Breakdown</h3>
           <div id="payment-breakdown-wrap"></div>
         </div>
+
+        <div class="card">
+          <h3 class="card-title">Daily Reports</h3>
+          <div id="daily-reports-wrap"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Item Performance</h3>
+          <div class="two-col-lists">
+            <div>
+              <div class="filter-section-title">Top 5 Sellers</div>
+              <div id="top-sellers-wrap"></div>
+            </div>
+            <div>
+              <div class="filter-section-title">Lowest 5 Sellers</div>
+              <div id="bottom-sellers-wrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Restock Trend <span class="card-title-hint">(last 6 months)</span></h3>
+          <div id="restock-trend-wrap"></div>
+          <div class="filter-section-title" style="margin-top:24px">Most Frequently Reordered</div>
+          <div id="most-reordered-wrap"></div>
+        </div>
       </div>
     </main>
 
@@ -152,7 +178,6 @@
   <script>
     setActiveNav('hub');
 
-    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const PROFIT_MARGIN = 0.13;
     const CATEGORY_COLORS = {
       Medicine: '#1D4ED8',
@@ -162,6 +187,7 @@
 
     let allHubInvoices = [];
     let allCategorySaleItems = [];
+    let allRequestStock = [];
     let hubDateFrom = '';
     let hubDateTo = '';
 
@@ -307,6 +333,157 @@
       return totals;
     }
 
+    function formatDayKeyDisplay(key) {
+      const [y, m, d] = key.split('-');
+      return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+    }
+
+    function getDailyReportRows() {
+      const invoices = getFilteredHubInvoices();
+      const byDay = {};
+      invoices.forEach(inv => {
+        const key = soldAtDayKey(inv.sold_at);
+        if (!key) return;
+        if (!byDay[key]) byDay[key] = { date: key, count: 0, total: 0 };
+        byDay[key].count += 1;
+        byDay[key].total += Number(inv.total) || 0;
+      });
+      return Object.values(byDay).sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function renderDailyReports() {
+      const wrap = document.getElementById('daily-reports-wrap');
+      const rows = getDailyReportRows();
+      if (!rows.length) {
+        renderEmptyChart(wrap, 'No invoices in this range.');
+        return;
+      }
+      wrap.innerHTML = `
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="num">Transactions</th>
+                <th class="num">Total</th>
+                <th style="width:100px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${escapeHtml(formatDayKeyDisplay(r.date))}</td>
+                  <td class="num">${r.count}</td>
+                  <td class="num">${formatPKR(r.total)}</td>
+                  <td><a class="btn btn-secondary btn-sm" href="daily-report.html?date=${encodeURIComponent(r.date)}">View</a></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function getItemPerformance() {
+      const totals = {};
+      allCategorySaleItems.forEach(row => {
+        const soldAt = row.invoices && row.invoices.sold_at;
+        if (!soldAt) return;
+        if (!dateInRange(formatSoldAtDate(soldAt), hubDateFrom, hubDateTo)) return;
+        const name = row.item_name || 'Unknown';
+        const revenue = (Number(row.qty) || 0) * (Number(row.unit_price) || 0);
+        if (!totals[name]) totals[name] = { name, revenue: 0 };
+        totals[name].revenue += revenue;
+      });
+      return Object.values(totals);
+    }
+
+    function renderRankedList(container, list, valueFormatter) {
+      if (!list.length) {
+        renderEmptyChart(container, 'No data for this range.');
+        return;
+      }
+      container.innerHTML = `
+        <div class="ranked-list">
+          ${list.map((item, i) => `
+            <div class="ranked-list-item">
+              <span class="ranked-list-rank">${i + 1}</span>
+              <span class="ranked-list-name">${escapeHtml(item.name)}</span>
+              <span class="ranked-list-value">${valueFormatter(item)}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderItemPerformance() {
+      const items = getItemPerformance();
+      const sorted = items.slice().sort((a, b) => b.revenue - a.revenue);
+      const top5 = sorted.slice(0, 5);
+      const bottom5 = sorted.filter(i => i.revenue > 0).slice(-5).reverse();
+      renderRankedList(document.getElementById('top-sellers-wrap'), top5, item => formatPKR(item.revenue));
+      renderRankedList(document.getElementById('bottom-sellers-wrap'), bottom5, item => formatPKR(item.revenue));
+    }
+
+    function getLast6MonthKeys() {
+      const cur = currentMonthKey();
+      const [cy, cm] = cur.split('-').map(Number);
+      const keys = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(cy, cm - 1 - i, 1);
+        keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+      return keys;
+    }
+
+    function getRestockTrendData() {
+      const keys = getLast6MonthKeys();
+      const counts = {};
+      keys.forEach(k => { counts[k] = 0; });
+      allRequestStock.forEach(r => {
+        if (r.status !== 'fulfilled' || !r.fulfilled_at) return;
+        const key = soldAtMonthKey(r.fulfilled_at);
+        if (key in counts) counts[key] += 1;
+      });
+      return keys.map(k => ({ key: k, count: counts[k] }));
+    }
+
+    function renderRestockTrend(data) {
+      const wrap = document.getElementById('restock-trend-wrap');
+      const max = Math.max(...data.map(d => d.count), 1);
+      wrap.innerHTML = `
+        <div class="bar-chart">
+          ${data.map(d => {
+            const heightPct = d.count > 0 ? Math.max(4, Math.round((d.count / max) * 100)) : 2;
+            return `
+              <div class="bar-col">
+                <div class="bar-value">${d.count}</div>
+                <div class="bar" style="height:${heightPct}%"></div>
+                <div class="bar-label">${escapeHtml(monthKeyToLabel(d.key))}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function getMostReorderedItems() {
+      const counts = {};
+      allRequestStock.forEach(r => {
+        if (r.status !== 'fulfilled') return;
+        const name = r.item_name || 'Unknown';
+        counts[name] = (counts[name] || 0) + 1;
+      });
+      return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, count }));
+    }
+
+    function renderMostReordered(items) {
+      renderRankedList(document.getElementById('most-reordered-wrap'), items, item => `${item.count}×`);
+    }
+
     function renderPaymentBreakdown(invoices) {
       const wrap = document.getElementById('payment-breakdown-wrap');
       if (!invoices.length) {
@@ -353,6 +530,10 @@
       renderRevenueChart(allHubInvoices);
       renderCategoryPie(getCategoryRevenue());
       renderPaymentBreakdown(invoices);
+      renderDailyReports();
+      renderItemPerformance();
+      renderRestockTrend(getRestockTrendData());
+      renderMostReordered(getMostReorderedItems());
     }
 
     async function loadHub() {
@@ -361,12 +542,14 @@
         return;
       }
       try {
-        const [invoices, categorySaleItems] = await Promise.all([
+        const [invoices, categorySaleItems, requestStock] = await Promise.all([
           fetchInvoiceStats(),
           fetchCategorySaleItems(),
+          fetchRequestStock(),
         ]);
         allHubInvoices = invoices;
         allCategorySaleItems = categorySaleItems;
+        allRequestStock = requestStock;
         const range = getCurrentMonthRange();
         hubDateFrom = range.from;
         hubDateTo = range.to;

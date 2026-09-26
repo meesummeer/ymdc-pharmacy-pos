@@ -119,7 +119,7 @@ async function fetchInvoiceStats() {
 
 async function fetchCategorySaleItems() {
   return fetchAllPages(() =>
-    db.from('sale_items').select('category, qty, unit_price, invoices(sold_at)')
+    db.from('sale_items').select('item_name, category, qty, unit_price, invoices(sold_at)')
   );
 }
 
@@ -169,6 +169,14 @@ function soldAtMonthKey(sold_at) {
   if (!year) return 'Unknown';
   return `${year}-${month}`;
 }
+
+function soldAtDayKey(sold_at) {
+  const [day, month, year] = formatSoldAtDate(sold_at).split('/');
+  if (!year) return null;
+  return `${year}-${month}-${day}`;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // ── Auth ─────────────────────────────────────────────────────────
 let currentUser = null;

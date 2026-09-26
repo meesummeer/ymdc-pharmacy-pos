@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Report — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <div class="report-toolbar no-print">
+          <a href="hub.html" class="btn-text">← Back to Hub</a>
+          <button class="btn btn-primary btn-sm" id="btn-print">🖨 Print / Save as PDF</button>
+        </div>
+
+        <div class="report-sheet" id="report-sheet">
+          <div class="report-header">
+            <img src="logo.jpeg" alt="YMDC Logo" class="report-logo">
+            <div>
+              <h1>Yaseen Medical &amp; General Store</h1>
+              <div class="report-subtitle">Daily Sales Report</div>
+            </div>
+          </div>
+
+          <div class="report-date" id="report-date">Loading…</div>
+
+          <div id="report-body">
+            <div class="loading">Loading invoices</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function karachiDayBoundsUTC(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const startUTC = new Date(Date.UTC(y, m - 1, d, -5, 0, 0, 0));
+      const endUTC = new Date(Date.UTC(y, m - 1, d + 1, -5, 0, 0, 0));
+      return { startUTC, endUTC };
+    }
+
+    function formatDateKeyDisplay(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return `${MONTH_NAMES[m - 1]} ${d}, ${y}`;
+    }
+
+    async function fetchDayInvoices(dateStr) {
+      const { startUTC, endUTC } = karachiDayBoundsUTC(dateStr);
+      return fetchAllPages(() =>
+        db.from('invoices')
+          .select('*, sale_items(*)')
+          .gte('sold_at', startUTC.toISOString())
+          .lt('sold_at', endUTC.toISOString())
+          .order('sold_at', { ascending: true })
+      );
+    }
+
+    function invoiceTotal(inv) {
+      return (inv.sale_items || []).reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
+    }
+
+    function renderInvoiceBlock(inv) {
+      const items = inv.sale_items || [];
+      const total = invoiceTotal(inv);
+      return `
+        <div class="report-invoice-block">
+          <div class="report-invoice-block-header">
+            <span class="invoice-card-no">${escapeHtml(inv.invoice_no)}</span>
+            <span class="invoice-card-field"><strong>Time:</strong> ${escapeHtml(formatTimeDisplay(inv.sold_at))}</span>
+            <span class="invoice-card-field"><strong>Patient:</strong> ${inv.patient_name ? escapeHtml(inv.patient_name) : '—'}</span>
+            <span class="pill pill-other">${escapeHtml(inv.payment_method || '—')}</span>
+            <div class="invoice-card-total">${formatPKR(total)}</div>
+          </div>
+          <div class="invoice-card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th class="num">Qty</th>
+                  <th class="num">Unit Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(item => `
+                  <tr>
+                    <td>${escapeHtml(item.item_name || '—')}</td>
+                    <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category || '—')}</span></td>
+                    <td class="num">${item.qty || 0}</td>
+                    <td class="num">${formatPKR(item.unit_price || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReport(dateStr, invoices) {
+      document.getElementById('report-date').textContent = formatDateKeyDisplay(dateStr);
+      const bodyEl = document.getElementById('report-body');
+
+      if (!invoices.length) {
+        bodyEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><p>No invoices recorded on this day.</p></div>`;
+        return;
+      }
+
+      const withTotals = invoices.map(inv => ({ inv, total: invoiceTotal(inv) }));
+      const totalRevenue = withTotals.reduce((sum, x) => sum + x.total, 0);
+      const cashTotal = withTotals.filter(x => x.inv.payment_method !== 'Bank Transfer').reduce((sum, x) => sum + x.total, 0);
+      const bankTotal = withTotals.filter(x => x.inv.payment_method === 'Bank Transfer').reduce((sum, x) => sum + x.total, 0);
+
+      const summaryTable = `
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invoice No</th>
+                <th>Time</th>
+                <th>Patient</th>
+                <th>Payment</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${withTotals.map(({ inv, total }) => `
+                <tr>
+                  <td>${escapeHtml(inv.invoice_no)}</td>
+                  <td>${escapeHtml(formatTimeDisplay(inv.sold_at))}</td>
+                  <td>${inv.patient_name ? escapeHtml(inv.patient_name) : '—'}</td>
+                  <td><span class="pill pill-other">${escapeHtml(inv.payment_method || '—')}</span></td>
+                  <td class="num">${formatPKR(total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      const details = withTotals.map(({ inv }) => renderInvoiceBlock(inv)).join('');
+
+      const totals = `
+        <div class="report-totals">
+          <div class="report-totals-item">
+            <div class="report-totals-label">Invoices</div>
+            <div class="report-totals-value">${invoices.length}</div>
+          </div>
+          <div class="report-totals-item">
+            <div class="report-totals-label">Total Revenue</div>
+            <div class="report-totals-value">${formatPKR(totalRevenue)}</div>
+          </div>
+          <div class="report-totals-item">
+            <div class="report-totals-label">Cash</div>
+            <div class="report-totals-value">${formatPKR(cashTotal)}</div>
+          </div>
+          <div class="report-totals-item">
+            <div class="report-totals-label">Bank Transfer</div>
+            <div class="report-totals-value">${formatPKR(bankTotal)}</div>
+          </div>
+        </div>
+      `;
+
+      bodyEl.innerHTML = `
+        <div class="filter-section-title">Invoice Summary</div>
+        ${summaryTable}
+        <div class="filter-section-title" style="margin-top:28px">Invoice Details</div>
+        ${details}
+        ${totals}
+      `;
+    }
+
+    async function loadReport() {
+      const params = new URLSearchParams(location.search);
+      const dateStr = params.get('date');
+      if (!dateStr) {
+        document.getElementById('report-date').textContent = 'No date specified';
+        document.getElementById('report-body').innerHTML = `<div class="empty-state"><p>Missing ?date=YYYY-MM-DD in the URL.</p></div>`;
+        return;
+      }
+      try {
+        const invoices = await fetchDayInvoices(dateStr);
+        renderReport(dateStr, invoices);
+      } catch (err) {
+        document.getElementById('report-body').innerHTML = `<div class="empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
+        showToast('Failed to load report: ' + err.message, 'error');
+      }
+    }
+
+    document.getElementById('btn-print').addEventListener('click', () => window.print());
+
+    wireAuthGate();
+    initAuthGate(loadReport);
+  </script>
+</body>
+</html>
