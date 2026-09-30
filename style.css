@@ -830,6 +830,8 @@ td.num, th.num { text-align: right; }
 
 .filter-modal .modal { max-width: 520px; }
 
+.edit-modal .modal { max-width: 640px; }
+
 .invoice-card {
   background: var(--card);
   border: 1px solid var(--border);

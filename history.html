@@ -138,6 +138,69 @@
     </div>
   </div>
 
+  <!-- Edit Invoice Modal -->
+  <div class="modal-overlay edit-modal" id="edit-invoice-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Edit Invoice</h3>
+        <button class="modal-close" id="edit-invoice-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-invoice-id">
+
+        <div class="form-group">
+          <label for="edit-invoice-search" class="form-label">Add Item</label>
+          <div class="search-wrapper">
+            <input type="text" id="edit-invoice-search" class="input-lg input-search" placeholder="Search items…" autocomplete="off">
+            <div id="edit-invoice-search-dropdown" class="search-dropdown"></div>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="edit-invoice-cart-table" class="cart-table">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Qty</th>
+                <th class="num">Unit Price</th>
+                <th class="num">Line Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="edit-invoice-cart-body"></tbody>
+          </table>
+        </div>
+
+        <div class="cart-total-bar">
+          <span>Grand Total</span>
+          <span class="total-amount" id="edit-invoice-grand-total">PKR 0</span>
+        </div>
+
+        <div class="form-group" style="margin-top:16px">
+          <label for="edit-invoice-patient" class="form-label">Patient Name</label>
+          <input type="text" id="edit-invoice-patient" style="padding-left:16px">
+        </div>
+
+        <div class="form-group">
+          <label for="edit-invoice-date" class="form-label">Sale Date</label>
+          <input type="date" id="edit-invoice-date" class="input-lg" style="padding-left:16px">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Payment Method</label>
+          <div class="preset-pills" id="edit-invoice-payment-pills" style="margin-bottom:0">
+            <button type="button" class="preset-pill active" data-method="Cash">Cash</button>
+            <button type="button" class="preset-pill" data-method="Bank Transfer">Bank Transfer</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="edit-invoice-cancel">Cancel</button>
+        <button class="btn btn-primary" id="edit-invoice-save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
@@ -146,11 +209,31 @@
     let expandedInvoice = null;
     let activeFilters = defaultFilters();
 
+    let editCart = [];
+    let editInventory = [];
+    let editHighlightIndex = -1;
+    let editPaymentMethod = 'Cash';
+
     const historyContainer = document.getElementById('history-container');
     const filterModal = document.getElementById('filter-modal');
     const filterSummary = document.getElementById('filter-summary');
+    const editInvoiceModal = document.getElementById('edit-invoice-modal');
+    const editSearchInput = document.getElementById('edit-invoice-search');
+    const editSearchDropdown = document.getElementById('edit-invoice-search-dropdown');
+    const editCartBody = document.getElementById('edit-invoice-cart-body');
 
     setActiveNav('history');
+
+    function buildEditSoldAt(dateInputValue, originalSoldAt) {
+      const origDateStr = soldAtToInputValue(originalSoldAt);
+      if (dateInputValue === origDateStr) {
+        return originalSoldAt;
+      }
+      const [year, month, day] = dateInputValue.split('-').map(Number);
+      const now = new Date();
+      const combined = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      return combined.toISOString();
+    }
 
     function defaultFilters() {
       const range = getCurrentMonthRange();
@@ -253,6 +336,7 @@
             </div>
             <div class="invoice-card-header-right">
               <div class="invoice-card-total">${formatPKR(inv.total || 0)}</div>
+              ${isAdmin ? `<button type="button" class="btn-icon-only btn-edit-invoice" title="Edit invoice">✎</button>` : ''}
               ${isAdmin ? `<button type="button" class="btn-icon-only danger btn-delete-invoice" title="Delete invoice">🗑</button>` : ''}
             </div>
           </div>
@@ -304,6 +388,235 @@
       historyContainer.innerHTML = filtered.map(inv => renderInvoiceCard(inv)).join('');
     }
 
+    function updateEditGrandTotal() {
+      const total = editCart.reduce((sum, item) => sum + item.qty * (Number(item.price) || 0), 0);
+      document.getElementById('edit-invoice-grand-total').textContent = formatPKR(total);
+    }
+
+    function updateEditLineTotal(idx) {
+      const row = editCartBody.querySelector(`tr[data-idx="${idx}"]`);
+      if (!row) return;
+      const lineTotal = editCart[idx].qty * (Number(editCart[idx].price) || 0);
+      const cell = row.querySelector('.line-total-cell');
+      if (cell) cell.textContent = formatPKR(lineTotal);
+    }
+
+    function renderEditCart() {
+      editCartBody.innerHTML = editCart.map((item, idx) => `
+        <tr data-idx="${idx}">
+          <td><strong>${escapeHtml(item.name)}</strong></td>
+          <td>
+            <div class="qty-controls">
+              <button type="button" class="qty-btn" data-action="qty-minus" data-idx="${idx}">−</button>
+              <input type="number" value="${item.qty}" min="1" class="qty-input" data-idx="${idx}">
+              <button type="button" class="qty-btn" data-action="qty-plus" data-idx="${idx}">+</button>
+            </div>
+          </td>
+          <td class="num">
+            <div class="price-cell">
+              <span class="price-prefix">PKR</span>
+              <input type="number" class="price-input" value="${item.price}" min="0" step="1" data-idx="${idx}">
+            </div>
+          </td>
+          <td class="num line-total-cell"><strong>${formatPKR(item.qty * (Number(item.price) || 0))}</strong></td>
+          <td>
+            <button type="button" class="btn btn-danger btn-icon" data-action="remove" data-idx="${idx}" title="Remove">×</button>
+          </td>
+        </tr>
+      `).join('');
+      updateEditGrandTotal();
+    }
+
+    editCartBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      if (btn.dataset.action === 'qty-minus') {
+        editCart[idx].qty = Math.max(1, editCart[idx].qty - 1);
+        const input = editCartBody.querySelector(`.qty-input[data-idx="${idx}"]`);
+        if (input) input.value = editCart[idx].qty;
+        updateEditLineTotal(idx);
+        updateEditGrandTotal();
+      } else if (btn.dataset.action === 'qty-plus') {
+        editCart[idx].qty += 1;
+        const input = editCartBody.querySelector(`.qty-input[data-idx="${idx}"]`);
+        if (input) input.value = editCart[idx].qty;
+        updateEditLineTotal(idx);
+        updateEditGrandTotal();
+      } else if (btn.dataset.action === 'remove') {
+        editCart.splice(idx, 1);
+        renderEditCart();
+      }
+    });
+
+    editCartBody.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      if (Number.isNaN(idx) || !editCart[idx]) return;
+      if (e.target.classList.contains('price-input')) {
+        editCart[idx].price = Math.max(0, parseFloat(e.target.value) || 0);
+        updateEditLineTotal(idx);
+        updateEditGrandTotal();
+      } else if (e.target.classList.contains('qty-input')) {
+        editCart[idx].qty = Math.max(1, parseInt(e.target.value, 10) || 1);
+        updateEditLineTotal(idx);
+        updateEditGrandTotal();
+      }
+    });
+
+    editCartBody.addEventListener('blur', (e) => {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      if (Number.isNaN(idx) || !editCart[idx]) return;
+      if (e.target.classList.contains('qty-input')) {
+        e.target.value = editCart[idx].qty;
+      }
+    }, true);
+
+    function getEditFilteredItems(query) {
+      if (!query) return [];
+      const q = query.toLowerCase();
+      return editInventory.filter(item => item.name.toLowerCase().includes(q)).slice(0, 20);
+    }
+
+    function renderEditDropdown(items) {
+      if (!items.length) {
+        editSearchDropdown.classList.remove('open');
+        return;
+      }
+      editSearchDropdown.innerHTML = items.map((item, i) => `
+        <div class="search-dropdown-item${i === editHighlightIndex ? ' highlighted' : ''}"
+             data-id="${item.id}" data-index="${i}">
+          <span>${escapeHtml(item.name)}</span>
+          <span class="cat-badge ${categoryClass(item.category)}">${escapeHtml(item.category)}</span>
+        </div>
+      `).join('');
+      editSearchDropdown.classList.add('open');
+    }
+
+    function addToEditCart(item) {
+      const existing = editCart.find(c => c.id === item.id);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        editCart.push({ id: item.id, name: item.name, category: item.category, qty: 1, price: Number(item.price) || 0 });
+      }
+      editSearchInput.value = '';
+      editSearchDropdown.classList.remove('open');
+      editHighlightIndex = -1;
+      renderEditCart();
+    }
+
+    editSearchInput.addEventListener('input', () => {
+      editHighlightIndex = -1;
+      renderEditDropdown(getEditFilteredItems(editSearchInput.value.trim()));
+    });
+
+    editSearchInput.addEventListener('keydown', (e) => {
+      const items = getEditFilteredItems(editSearchInput.value.trim());
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        editHighlightIndex = Math.min(editHighlightIndex + 1, items.length - 1);
+        renderEditDropdown(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        editHighlightIndex = Math.max(editHighlightIndex - 1, 0);
+        renderEditDropdown(items);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        addToEditCart(items[editHighlightIndex >= 0 ? editHighlightIndex : 0]);
+      } else if (e.key === 'Escape') {
+        editSearchDropdown.classList.remove('open');
+      }
+    });
+
+    editSearchDropdown.addEventListener('click', (e) => {
+      const el = e.target.closest('.search-dropdown-item');
+      if (!el) return;
+      const item = editInventory.find(i => i.id === el.dataset.id);
+      if (item) addToEditCart(item);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrapper')) editSearchDropdown.classList.remove('open');
+    });
+
+    async function ensureEditInventoryLoaded() {
+      if (editInventory.length) return;
+      try {
+        editInventory = await fetchInventory();
+      } catch (err) {
+        showToast('Failed to load inventory: ' + err.message, 'error');
+      }
+    }
+
+    async function openEditInvoiceModal(invoice) {
+      await ensureEditInventoryLoaded();
+      document.getElementById('edit-invoice-id').value = invoice.id;
+      document.getElementById('edit-invoice-patient').value = invoice.patient_name || '';
+      document.getElementById('edit-invoice-date').value = soldAtToInputValue(invoice.sold_at);
+
+      editPaymentMethod = invoice.payment_method === 'Bank Transfer' ? 'Bank Transfer' : 'Cash';
+      document.querySelectorAll('#edit-invoice-payment-pills .preset-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.method === editPaymentMethod);
+      });
+
+      editCart = (invoice.sale_items || []).map(item => ({
+        id: item.item_id,
+        name: item.item_name,
+        category: item.category,
+        qty: item.qty,
+        price: Number(item.unit_price) || 0,
+      }));
+      renderEditCart();
+
+      editSearchInput.value = '';
+      editSearchDropdown.classList.remove('open');
+      editInvoiceModal.classList.add('open');
+    }
+
+    function closeEditInvoiceModal() {
+      editInvoiceModal.classList.remove('open');
+    }
+
+    document.getElementById('edit-invoice-close').addEventListener('click', closeEditInvoiceModal);
+    document.getElementById('edit-invoice-cancel').addEventListener('click', closeEditInvoiceModal);
+    editInvoiceModal.addEventListener('click', (e) => { if (e.target === editInvoiceModal) closeEditInvoiceModal(); });
+
+    document.getElementById('edit-invoice-payment-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      editPaymentMethod = pill.dataset.method;
+      document.querySelectorAll('#edit-invoice-payment-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    document.getElementById('edit-invoice-save').addEventListener('click', async () => {
+      if (!editCart.length) {
+        showToast('An invoice must have at least one item — use Delete Invoice to remove it entirely.', 'warning');
+        return;
+      }
+      const id = document.getElementById('edit-invoice-id').value;
+      const patientName = document.getElementById('edit-invoice-patient').value.trim();
+      const dateVal = document.getElementById('edit-invoice-date').value;
+      const original = allInvoices.find(inv => inv.id === id);
+      const soldAt = buildEditSoldAt(dateVal, original ? original.sold_at : new Date().toISOString());
+
+      const saveBtn = document.getElementById('edit-invoice-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try {
+        await editInvoice(id, patientName, editPaymentMethod, soldAt, editCart);
+        showToast('Invoice updated', 'success');
+        closeEditInvoiceModal();
+        await loadHistory();
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+      }
+    });
+
     function applyThisMonth() {
       activeFilters = defaultFilters();
       expandedInvoice = null;
@@ -311,6 +624,17 @@
     }
 
     historyContainer.addEventListener('click', async (e) => {
+      const editBtn = e.target.closest('.btn-edit-invoice');
+      if (editBtn) {
+        const card = editBtn.closest('.invoice-card[data-invoice]');
+        if (!card) return;
+        const id = card.dataset.id;
+        const invoice = allInvoices.find(inv => inv.id === id);
+        if (!invoice) return;
+        await openEditInvoiceModal(invoice);
+        return;
+      }
+
       const deleteBtn = e.target.closest('.btn-delete-invoice');
       if (deleteBtn) {
         const card = deleteBtn.closest('.invoice-card[data-invoice]');

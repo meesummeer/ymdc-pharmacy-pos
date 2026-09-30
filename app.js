@@ -106,6 +106,22 @@ async function deleteInvoice(id) {
   if (error) throw new Error(error.message);
 }
 
+async function editInvoice(invoiceId, patientName, paymentMethod, soldAt, cart) {
+  const p_items = cart.map(item => ({
+    id: item.id, name: item.name, category: item.category,
+    qty: Number(item.qty) || 1, price: Number(item.price) || 0,
+  }));
+  const { data, error } = await db.rpc('edit_invoice', {
+    p_invoice_id: invoiceId,
+    p_patient_name: patientName,
+    p_payment_method: paymentMethod,
+    p_sold_at: soldAt,
+    p_items,
+  });
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
+}
+
 async function fetchInvoiceStats() {
   const data = await fetchAllPages(() =>
     db.from('invoices').select('sold_at, payment_method, sale_items(qty, unit_price)').order('sold_at', { ascending: true })
@@ -174,6 +190,10 @@ function soldAtDayKey(sold_at) {
   const [day, month, year] = formatSoldAtDate(sold_at).split('/');
   if (!year) return null;
   return `${year}-${month}-${day}`;
+}
+
+function soldAtToInputValue(sold_at) {
+  return soldAtDayKey(sold_at) || '';
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
