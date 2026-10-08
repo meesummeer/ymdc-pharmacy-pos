@@ -1340,6 +1340,178 @@ input.input-error {
 .toast-error { border-left-color: var(--error); }
 .toast-warning { border-left-color: var(--gold); }
 
+/* ── Needs-reorder (admin inventory) ─────────────────────────────── */
+.low-stock-admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(201, 168, 76, 0.55);
+}
+
+.banner-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.banner-link:hover { color: var(--navy-hover); }
+
+.reorder-modal .modal { max-width: 640px; }
+
+.reorder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.reorder-controls .preset-pills { margin-bottom: 0; }
+
+.reorder-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.reorder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.reorder-row:last-child { border-bottom: none; }
+
+.reorder-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reorder-row-qty {
+  min-width: 36px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text-body);
+}
+
+.reorder-row-qty.zero { color: var(--error); }
+
+.reorder-names {
+  min-height: 130px;
+  resize: vertical;
+  line-height: 1.5;
+  background: var(--bg);
+}
+
+.pill-requested {
+  background: #D1FAE5;
+  color: #047857;
+}
+
+.pill-not-requested {
+  background: rgba(201, 168, 76, 0.18);
+  color: var(--gold-dark);
+}
+
+/* ── Analytics ───────────────────────────────────────────────────── */
+.card-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.card-title-link:hover { text-decoration: underline; }
+
+.stat-value.stat-value-name {
+  font-size: 18px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.stat-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.analytics-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-toolbar .preset-pills { margin-bottom: 0; }
+
+.analytics-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.data-table th.sortable:hover { background: var(--navy-hover); }
+
+.sort-ind {
+  display: inline-block;
+  width: 10px;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--gold);
+}
+
+.data-table tfoot td {
+  font-weight: 700;
+  color: var(--navy);
+  background: #FAFBFC;
+  border-top: 2px solid var(--navy);
+  border-bottom: none;
+}
+
+.analytics-note {
+  padding: 14px 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .header-inner { padding: 0 12px; }

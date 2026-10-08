@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+            <a href="analytics.html" class="nav-link active" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Item Analytics</h2>
+
+        <div class="filter-bar card">
+          <div id="an-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
+            Loading…
+          </div>
+          <div class="filter-bar-actions">
+            <button class="btn btn-secondary btn-sm" id="an-btn-export">Export CSV</button>
+            <button class="btn btn-primary btn-sm" id="an-btn-open-filter">Filter</button>
+          </div>
+        </div>
+
+        <div class="card-grid" id="an-headlines">
+          <div class="card stat-card">
+            <span class="stat-label">Best seller · units</span>
+            <span class="stat-value stat-value-name" id="an-best-units">—</span>
+            <span class="stat-sub" id="an-best-units-sub"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Best seller · revenue</span>
+            <span class="stat-value stat-value-name" id="an-best-revenue">—</span>
+            <span class="stat-sub" id="an-best-revenue-sub"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Slowest mover</span>
+            <span class="stat-value stat-value-name" id="an-slowest">—</span>
+            <span class="stat-sub" id="an-slowest-sub"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Distinct items sold</span>
+            <span class="stat-value" id="an-distinct">0</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="analytics-toolbar">
+            <div class="analytics-toolbar-left">
+              <span class="filter-section-title" style="margin:0">Rank by</span>
+              <div class="preset-pills" id="an-rank-toggle">
+                <button type="button" class="preset-pill" data-rank="units">Units</button>
+                <button type="button" class="preset-pill" data-rank="revenue">Revenue</button>
+              </div>
+            </div>
+            <span class="card-title-hint" id="an-count"></span>
+          </div>
+          <div id="an-table-wrap">
+            <div class="loading">Loading sales</div>
+          </div>
+          <div class="analytics-note">
+            Units are counted as sold at the POS — loose tablets count per tablet, boxes count per box — so compare revenue before drawing conclusions across different types of items.
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <div class="modal-overlay filter-modal" id="an-filter-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Filter Analytics</h3>
+        <button class="modal-close" id="an-filter-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="filter-section-title">Date Range</div>
+        <div class="form-group">
+          <label for="an-date-from" class="form-label">From</label>
+          <input type="text" id="an-date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label for="an-date-to" class="form-label">To</label>
+          <input type="text" id="an-date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="preset-pills" id="an-preset-pills">
+          <button type="button" class="preset-pill" data-preset="today">Today</button>
+          <button type="button" class="preset-pill" data-preset="yesterday">Yesterday</button>
+          <button type="button" class="preset-pill" data-preset="this-week">This Week</button>
+          <button type="button" class="preset-pill" data-preset="this-month">This Month</button>
+          <button type="button" class="preset-pill" data-preset="last-month">Last Month</button>
+          <button type="button" class="preset-pill" data-preset="all-time">All Time</button>
+        </div>
+
+        <div class="form-group">
+          <label for="an-category" class="form-label">Category</label>
+          <select id="an-category">
+            <option value="All">All</option>
+            <option value="Medicine">Medicine</option>
+            <option value="Snack">Snack</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="an-search" class="form-label">Item Name (optional)</label>
+          <input type="text" id="an-search" placeholder="Filter by item name">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="an-min-units" class="form-label">Min units sold</label>
+          <input type="number" id="an-min-units" min="0" step="1" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-spread">
+          <button type="button" class="btn-text" id="an-filter-cancel">Cancel</button>
+          <div class="modal-footer-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="an-filter-reset">Reset</button>
+            <button type="button" class="btn btn-primary btn-sm" id="an-filter-apply">Apply Filters</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    setActiveNav('analytics');
+
+    const COLUMNS = [
+      { key: 'rank', label: '#', num: true, sortable: false },
+      { key: 'name', label: 'Item', sortable: true, defaultDir: 'asc' },
+      { key: 'category', label: 'Category', sortable: true, defaultDir: 'asc' },
+      { key: 'units', label: 'Units', num: true, sortable: true, defaultDir: 'desc' },
+      { key: 'revenue', label: 'Revenue', num: true, sortable: true, defaultDir: 'desc' },
+      { key: 'invoices', label: 'Invoices', num: true, sortable: true, defaultDir: 'desc' },
+      { key: 'avg', label: 'Avg price', num: true, sortable: true, defaultDir: 'desc' },
+      { key: 'last', label: 'Last sold', sortable: true, defaultDir: 'desc' },
+    ];
+
+    let anRows = [];
+    let anItems = [];
+    let anFetchedKey = null;
+    let anRequestSeq = 0;
+    let anFilters = defaultAnFilters();
+    let anSort = { key: 'units', dir: 'desc' };
+
+    const anFilterModal = document.getElementById('an-filter-modal');
+    const anTableWrap = document.getElementById('an-table-wrap');
+
+    function defaultAnFilters() {
+      const range = getCurrentMonthRange();
+      return { from: range.from, to: range.to, category: 'All', search: '', minUnits: 0 };
+    }
+
+    // Asia/Karachi calendar days -> UTC-safe ISO bounds (null = unbounded)
+    function rangeToISOBounds(fromDMY, toDMY) {
+      const f = parseDMYParts(fromDMY);
+      const t = parseDMYParts(toDMY);
+      const pad = (n, w = 2) => String(n).padStart(w, '0');
+      return {
+        startISO: f ? `${pad(f.year, 4)}-${pad(f.month)}-${pad(f.day)}T00:00:00+05:00` : null,
+        endISO: t ? `${pad(t.year, 4)}-${pad(t.month)}-${pad(t.day)}T23:59:59.999+05:00` : null,
+      };
+    }
+
+    async function fetchSaleRows(fromDMY, toDMY) {
+      const { startISO, endISO } = rangeToISOBounds(fromDMY, toDMY);
+      return fetchAllPages(() => {
+        let q = db.from('sale_items')
+          .select('id,invoice_id,item_id,item_name,category,qty,unit_price,invoices!inner(sold_at)');
+        if (startISO) q = q.gte('invoices.sold_at', startISO);
+        if (endISO) q = q.lte('invoices.sold_at', endISO);
+        return q.order('id');
+      });
+    }
+
+    function aggregate(rows) {
+      const map = new Map();
+      rows.forEach(r => {
+        const soldAt = r.invoices && r.invoices.sold_at;
+        const name = String(r.item_name || '').trim() || 'Unknown';
+        const key = r.item_id ? `id:${r.item_id}` : `name:${name.toLowerCase()}`;
+        let g = map.get(key);
+        if (!g) {
+          g = { key, name, category: r.category || 'Other', units: 0, revenue: 0, invoiceIds: new Set(), lastSold: null, lastTs: -1 };
+          map.set(key, g);
+        }
+        const qty = Number(r.qty) || 0;
+        g.units += qty;
+        g.revenue += qty * (Number(r.unit_price) || 0);
+        g.invoiceIds.add(r.invoice_id || `line:${r.id}`);
+        const ts = soldAt ? new Date(soldAt).getTime() : 0;
+        if (ts >= g.lastTs) {
+          g.lastTs = ts;
+          g.lastSold = soldAt;
+          g.name = name;
+          g.category = r.category || g.category;
+        }
+      });
+      return Array.from(map.values()).map(g => ({
+        key: g.key,
+        name: g.name,
+        category: g.category,
+        units: g.units,
+        revenue: g.revenue,
+        invoices: g.invoiceIds.size,
+        avg: g.units ? g.revenue / g.units : 0,
+        last: g.lastTs,
+        lastSold: g.lastSold,
+      }));
+    }
+
+    function getVisibleItems() {
+      const q = anFilters.search.trim().toLowerCase();
+      const min = Number(anFilters.minUnits) || 0;
+      return anItems.filter(i =>
+        (anFilters.category === 'All' || i.category === anFilters.category) &&
+        (!q || i.name.toLowerCase().includes(q)) &&
+        i.units >= min
+      );
+    }
+
+    function sortItems(list) {
+      const { key, dir } = anSort;
+      const m = dir === 'asc' ? 1 : -1;
+      const val = (i) => (key === 'name' || key === 'category') ? String(i[key]).toLowerCase() : i[key];
+      return list.slice().sort((a, b) => {
+        const va = val(a), vb = val(b);
+        if (va < vb) return -1 * m;
+        if (va > vb) return 1 * m;
+        if (key !== 'revenue' && b.revenue !== a.revenue) return b.revenue - a.revenue;
+        if (b.units !== a.units) return b.units - a.units;
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+    }
+
+    function summaryText() {
+      const parts = [escapeHtml(formatRangeLabel(anFilters.from, anFilters.to))];
+      parts.push(anFilters.category === 'All' ? 'All categories' : escapeHtml(anFilters.category));
+      if (anFilters.search.trim()) parts.push(`“${escapeHtml(anFilters.search.trim())}”`);
+      if (Number(anFilters.minUnits) > 0) parts.push(`≥ ${Number(anFilters.minUnits)} units`);
+      return parts.join(' · ');
+    }
+
+    function renderHeadlines(items) {
+      const setCard = (id, name, sub) => {
+        document.getElementById(id).textContent = name;
+        document.getElementById(id + '-sub').textContent = sub;
+      };
+      if (!items.length) {
+        setCard('an-best-units', '—', '');
+        setCard('an-best-revenue', '—', '');
+        setCard('an-slowest', '—', '');
+        document.getElementById('an-distinct').textContent = '0';
+        return;
+      }
+      const bestUnits = items.slice().sort((a, b) => (b.units - a.units) || (b.revenue - a.revenue))[0];
+      const bestRevenue = items.slice().sort((a, b) => (b.revenue - a.revenue) || (b.units - a.units))[0];
+      const sold = items.filter(i => i.units > 0);
+      let slowestSub = '';
+      let slowestName = '—';
+      if (sold.length) {
+        const minUnits = Math.min(...sold.map(i => i.units));
+        const tied = sold.filter(i => i.units === minUnits).sort((a, b) => a.last - b.last);
+        slowestName = tied[0].name;
+        slowestSub = `${tied[0].units} unit${tied[0].units !== 1 ? 's' : ''} · ${formatPKR(tied[0].revenue)}` +
+          (tied.length > 1 ? ` · +${tied.length - 1} more tied` : '');
+      }
+      setCard('an-best-units', bestUnits.name, `${bestUnits.units.toLocaleString('en-PK')} units · ${formatPKR(bestUnits.revenue)}`);
+      setCard('an-best-revenue', bestRevenue.name, `${formatPKR(bestRevenue.revenue)} · ${bestRevenue.units.toLocaleString('en-PK')} units`);
+      setCard('an-slowest', slowestName, slowestSub);
+      document.getElementById('an-distinct').textContent = items.length.toLocaleString('en-PK');
+    }
+
+    function renderTable(sorted) {
+      if (!sorted.length) {
+        anTableWrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📈</div><p>No sales match these filters</p><small>Try a wider date range or clear the name / min-units filters.</small></div>`;
+        return;
+      }
+      const head = COLUMNS.map(c => {
+        if (!c.sortable) return `<th class="${c.num ? 'num' : ''}">${c.label}</th>`;
+        const active = anSort.key === c.key;
+        const ind = active ? (anSort.dir === 'asc' ? '▲' : '▼') : '';
+        return `<th class="sortable${c.num ? ' num' : ''}" data-sort="${c.key}" title="Sort by ${c.label}">${c.label}<span class="sort-ind">${ind}</span></th>`;
+      }).join('');
+
+      const totalUnits = sorted.reduce((s, i) => s + i.units, 0);
+      const totalRevenue = sorted.reduce((s, i) => s + i.revenue, 0);
+
+      const body = sorted.map((i, idx) => `
+        <tr>
+          <td class="num">${idx + 1}</td>
+          <td><strong>${escapeHtml(i.name)}</strong></td>
+          <td><span class="pill pill-${categoryClass(i.category)}">${escapeHtml(i.category)}</span></td>
+          <td class="num">${i.units.toLocaleString('en-PK')}</td>
+          <td class="num">${formatPKR(i.revenue)}</td>
+          <td class="num">${i.invoices.toLocaleString('en-PK')}</td>
+          <td class="num">${formatPKR(i.avg)}</td>
+          <td>${escapeHtml(formatSoldAtDate(i.lastSold) || '—')}</td>
+        </tr>
+      `).join('');
+
+      anTableWrap.innerHTML = `
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr>${head}</tr></thead>
+            <tbody>${body}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3">Total · ${sorted.length.toLocaleString('en-PK')} item${sorted.length !== 1 ? 's' : ''}</td>
+                <td class="num">${totalUnits.toLocaleString('en-PK')}</td>
+                <td class="num" id="an-total-revenue">${formatPKR(totalRevenue)}</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderAnalytics() {
+      const items = getVisibleItems();
+      const sorted = sortItems(items);
+      document.getElementById('an-summary').innerHTML = summaryText();
+      document.getElementById('an-count').textContent = `${items.length.toLocaleString('en-PK')} item${items.length !== 1 ? 's' : ''}`;
+      document.querySelectorAll('#an-rank-toggle .preset-pill').forEach(p => {
+        p.classList.toggle('active', anSort.key === p.dataset.rank && anSort.dir === 'desc');
+      });
+      renderHeadlines(items);
+      renderTable(sorted);
+    }
+
+    async function loadAnalytics() {
+      const key = `${anFilters.from}|${anFilters.to}`;
+      if (key === anFetchedKey) {
+        renderAnalytics();
+        return;
+      }
+      const seq = ++anRequestSeq;
+      anTableWrap.innerHTML = '<div class="loading">Loading sales</div>';
+      try {
+        const rows = await fetchSaleRows(anFilters.from, anFilters.to);
+        if (seq !== anRequestSeq) return;
+        anRows = rows;
+        anItems = aggregate(rows);
+        anFetchedKey = key;
+        renderAnalytics();
+      } catch (err) {
+        if (seq !== anRequestSeq) return;
+        anTableWrap.innerHTML = `<div class="empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
+        showToast('Failed to load analytics: ' + err.message, 'error');
+      }
+    }
+
+    async function initAnalytics() {
+      if (currentRole !== 'admin') {
+        location.replace('index.html');
+        return;
+      }
+      await loadAnalytics();
+    }
+
+    // ── Sorting ────────────────────────────────────────────────────
+    anTableWrap.addEventListener('click', (e) => {
+      const th = e.target.closest('th[data-sort]');
+      if (!th) return;
+      const key = th.dataset.sort;
+      if (anSort.key === key) {
+        anSort.dir = anSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        const col = COLUMNS.find(c => c.key === key);
+        anSort = { key, dir: col.defaultDir };
+      }
+      renderAnalytics();
+    });
+
+    document.getElementById('an-rank-toggle').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      anSort = { key: pill.dataset.rank, dir: 'desc' };
+      renderAnalytics();
+    });
+
+    // ── Filter modal ───────────────────────────────────────────────
+    function syncModalFromFilters() {
+      document.getElementById('an-date-from').value = anFilters.from;
+      document.getElementById('an-date-to').value = anFilters.to;
+      document.getElementById('an-category').value = anFilters.category;
+      document.getElementById('an-search').value = anFilters.search;
+      document.getElementById('an-min-units').value = anFilters.minUnits;
+      document.querySelectorAll('#an-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+    }
+
+    function openFilterModal() {
+      syncModalFromFilters();
+      anFilterModal.classList.add('open');
+    }
+
+    function closeFilterModal() {
+      anFilterModal.classList.remove('open');
+    }
+
+    document.getElementById('an-btn-open-filter').addEventListener('click', openFilterModal);
+    document.getElementById('an-filter-close').addEventListener('click', closeFilterModal);
+    document.getElementById('an-filter-cancel').addEventListener('click', closeFilterModal);
+    anFilterModal.addEventListener('click', (e) => { if (e.target === anFilterModal) closeFilterModal(); });
+
+    document.getElementById('an-preset-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      const range = pill.dataset.preset === 'all-time' ? { from: '', to: '' } : getDateRangePreset(pill.dataset.preset);
+      document.getElementById('an-date-from').value = range.from;
+      document.getElementById('an-date-to').value = range.to;
+      document.querySelectorAll('#an-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    document.getElementById('an-filter-apply').addEventListener('click', () => {
+      const from = document.getElementById('an-date-from').value.trim();
+      const to = document.getElementById('an-date-to').value.trim();
+      const f = parseDMYParts(from);
+      const t = parseDMYParts(to);
+      if ((from && !f) || (to && !t)) {
+        showToast('Dates must be in DD/MM/YYYY format', 'warning');
+        return;
+      }
+      if (f && t && dmyToNumber(f) > dmyToNumber(t)) {
+        showToast('"From" date is after the "To" date', 'warning');
+        return;
+      }
+      anFilters = {
+        from,
+        to,
+        category: document.getElementById('an-category').value,
+        search: document.getElementById('an-search').value,
+        minUnits: Math.max(0, parseInt(document.getElementById('an-min-units').value, 10) || 0),
+      };
+      closeFilterModal();
+      loadAnalytics();
+    });
+
+    document.getElementById('an-filter-reset').addEventListener('click', () => {
+      anFilters = defaultAnFilters();
+      syncModalFromFilters();
+    });
+
+    // ── CSV export ─────────────────────────────────────────────────
+    function csvCell(v) {
+      let s = String(v == null ? '' : v);
+      if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }
+
+    function exportCsv() {
+      const sorted = sortItems(getVisibleItems());
+      if (!sorted.length) {
+        showToast('Nothing to export for these filters', 'warning');
+        return;
+      }
+      const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+      const rows = [['Rank', 'Item', 'Category', 'Units sold', 'Revenue (PKR)', 'Invoices', 'Avg unit price (PKR)', 'Last sold']];
+      sorted.forEach((i, idx) => rows.push([idx + 1, i.name, i.category, i.units, round2(i.revenue), i.invoices, round2(i.avg), formatSoldAtDate(i.lastSold)]));
+      const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const stamp = (anFilters.from || anFilters.to)
+        ? `${(anFilters.from || 'start').replace(/\//g, '-')}_to_${(anFilters.to || 'now').replace(/\//g, '-')}`
+        : 'all-time';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `item-analytics_${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`Exported ${sorted.length} item${sorted.length !== 1 ? 's' : ''}`, 'success');
+    }
+
+    document.getElementById('an-btn-export').addEventListener('click', exportCsv);
+
+    wireAuthGate();
+    initAuthGate(initAnalytics);
+  </script>
+</body>
+</html>

@@ -24,6 +24,7 @@
             <a href="history.html" class="nav-link" data-page="history">History</a>
             <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+            <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
           </nav>
           <div class="user-area">
             <span class="user-email" id="user-email"></span>
@@ -131,6 +132,37 @@
     </div>
   </div>
 
+  <div class="modal-overlay reorder-modal" id="reorder-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Needs Reorder</h3>
+        <button class="modal-close" id="reorder-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="reorder-controls">
+          <div class="preset-pills" id="reorder-chips">
+            <button type="button" class="preset-pill" data-chip="all">All</button>
+            <button type="button" class="preset-pill" data-chip="not">Not requested</button>
+            <button type="button" class="preset-pill" data-chip="req">Requested</button>
+          </div>
+          <div class="preset-pills" id="reorder-scope">
+            <button type="button" class="preset-pill" data-scope="out">Out of stock only (0)</button>
+            <button type="button" class="preset-pill" data-scope="low" id="reorder-scope-low">Low + out</button>
+          </div>
+        </div>
+        <div class="reorder-list" id="reorder-list"></div>
+        <div class="filter-section-title" id="reorder-names-label">Names to copy</div>
+        <textarea id="reorder-names" class="reorder-names" readonly aria-label="Item names to copy"></textarea>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-spread" style="flex-wrap:wrap;gap:10px">
+          <button type="button" class="btn btn-secondary btn-sm" id="reorder-bulk-add">Add all 0 not-requested to Request Stock</button>
+          <button type="button" class="btn btn-primary btn-sm" id="reorder-copy">Copy names</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
@@ -142,6 +174,14 @@
 
     const inventoryBody = document.getElementById('inventory-body');
     const lowStockBanner = document.getElementById('low-stock-banner');
+    const reorderModal = document.getElementById('reorder-modal');
+    const reorderList = document.getElementById('reorder-list');
+    const reorderNames = document.getElementById('reorder-names');
+
+    let pendingRequests = [];
+    let pendingState = 'loading';
+    let reorderChip = 'all';
+    let reorderScope = 'low';
     const itemModal = document.getElementById('item-modal');
     const modalTitle = document.getElementById('modal-title');
     const editId = document.getElementById('edit-id');
@@ -182,9 +222,196 @@
       const shown = lowItems.slice(0, 5);
       const remainder = lowItems.length - shown.length;
       const namesText = shown.map(item => `${escapeHtml(item.name)} (${item.quantity || 0})`).join(', ');
-      lowStockBanner.innerHTML = `⚠ <strong>${lowItems.length}</strong> item${lowItems.length !== 1 ? 's' : ''} low in stock: ${namesText}${remainder > 0 ? ` and ${remainder} more` : ''}`;
+      let html = `⚠ <strong>${lowItems.length}</strong> item${lowItems.length !== 1 ? 's' : ''} low in stock: ${namesText}${remainder > 0 ? ` and ${remainder} more` : ''}`;
+      if (currentRole === 'admin') html += renderAdminReorderRow(lowItems);
+      lowStockBanner.innerHTML = html;
       lowStockBanner.style.display = 'block';
     }
+
+    function normName(s) {
+      return String(s || '').trim().toLowerCase();
+    }
+
+    function buildRequestedIndex() {
+      const ids = new Set();
+      const names = new Set();
+      pendingRequests.forEach(r => {
+        if (r.item_id) ids.add(r.item_id);
+        else if (r.item_name) names.add(normName(r.item_name));
+      });
+      return { ids, names };
+    }
+
+    function isRequested(item, idx) {
+      return idx.ids.has(item.id) || idx.names.has(normName(item.name));
+    }
+
+    function renderAdminReorderRow(lowItems) {
+      if (pendingState === 'loading') {
+        return '<div class="low-stock-admin-row"><span>Checking request list…</span></div>';
+      }
+      if (pendingState === 'error') {
+        return '<div class="low-stock-admin-row"><span>Request list unavailable — reload to retry.</span></div>';
+      }
+      const idx = buildRequestedIndex();
+      const requested = lowItems.filter(i => isRequested(i, idx)).length;
+      const notRequested = lowItems.length - requested;
+      return `<div class="low-stock-admin-row">
+        <span>On request list: <strong>${requested}</strong> · Not yet requested: <button type="button" class="banner-link" id="banner-not-requested" title="Show items not yet requested">${notRequested}</button></span>
+        <button type="button" class="btn btn-secondary btn-sm" id="banner-view-list">View / Copy list</button>
+      </div>`;
+    }
+
+    async function refreshPendingRequests() {
+      if (currentRole !== 'admin') return;
+      try {
+        pendingRequests = await fetchPendingRequests();
+        pendingState = 'ready';
+      } catch (err) {
+        console.error('Pending requests refresh failed:', err);
+        if (pendingState !== 'ready') {
+          pendingState = 'error';
+          showToast('Failed to load request list: ' + err.message, 'error');
+        }
+      }
+      renderLowStockBanner();
+      if (reorderModal.classList.contains('open')) renderReorderModal();
+    }
+
+    function getReorderRows() {
+      const limit = reorderScope === 'out' ? 0 : LOW_STOCK_THRESHOLD;
+      const idx = buildRequestedIndex();
+      return allItems
+        .filter(i => (i.quantity || 0) <= limit)
+        .map(i => ({ item: i, requested: isRequested(i, idx) }))
+        .filter(r => reorderChip === 'all' || (reorderChip === 'not' ? !r.requested : r.requested))
+        .sort((a, b) => String(a.item.name).localeCompare(String(b.item.name), undefined, { sensitivity: 'base' }));
+    }
+
+    function renderReorderModal() {
+      const rows = getReorderRows();
+
+      document.querySelectorAll('#reorder-chips .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.chip === reorderChip));
+      document.querySelectorAll('#reorder-scope .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.scope === reorderScope));
+      document.getElementById('reorder-scope-low').textContent = `Low + out (≤ ${LOW_STOCK_THRESHOLD})`;
+
+      reorderList.innerHTML = rows.length
+        ? rows.map(r => {
+            const qty = r.item.quantity || 0;
+            return `<div class="reorder-row">
+              <span class="reorder-row-name" title="${escapeHtml(r.item.name)}">${escapeHtml(r.item.name)}</span>
+              <span class="reorder-row-qty${qty === 0 ? ' zero' : ''}">${qty}</span>
+              <span class="pill ${r.requested ? 'pill-requested' : 'pill-not-requested'}">${r.requested ? 'Requested' : 'Not requested'}</span>
+            </div>`;
+          }).join('')
+        : '<div class="empty-state" style="padding:28px 16px"><p>Nothing matches.</p></div>';
+
+      const names = rows.map(r => String(r.item.name).replace(/\s*\n\s*/g, ' ').trim());
+      reorderNames.value = names.join('\n');
+      document.getElementById('reorder-names-label').textContent = `Names to copy · ${names.length} item${names.length !== 1 ? 's' : ''}`;
+
+      const notRequestedCount = rows.filter(r => !r.requested).length;
+      const bulkBtn = document.getElementById('reorder-bulk-add');
+      bulkBtn.textContent = `Add all ${notRequestedCount} not-requested to Request Stock`;
+      bulkBtn.disabled = notRequestedCount === 0;
+      document.getElementById('reorder-copy').disabled = names.length === 0;
+    }
+
+    function openReorderModal(chip) {
+      reorderChip = chip || 'all';
+      reorderScope = 'low';
+      renderReorderModal();
+      reorderModal.classList.add('open');
+    }
+
+    function closeReorderModal() {
+      reorderModal.classList.remove('open');
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (err) {
+        console.warn('navigator.clipboard failed, using fallback:', err);
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+
+    lowStockBanner.addEventListener('click', (e) => {
+      if (e.target.closest('#banner-not-requested')) openReorderModal('not');
+      else if (e.target.closest('#banner-view-list')) openReorderModal('all');
+    });
+
+    document.getElementById('reorder-close').addEventListener('click', closeReorderModal);
+    reorderModal.addEventListener('click', (e) => { if (e.target === reorderModal) closeReorderModal(); });
+
+    document.getElementById('reorder-chips').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      reorderChip = pill.dataset.chip;
+      renderReorderModal();
+    });
+
+    document.getElementById('reorder-scope').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      reorderScope = pill.dataset.scope;
+      renderReorderModal();
+    });
+
+    document.getElementById('reorder-copy').addEventListener('click', async () => {
+      const text = reorderNames.value;
+      const count = text ? text.split('\n').length : 0;
+      if (!count) {
+        showToast('Nothing to copy', 'warning');
+        return;
+      }
+      const ok = await copyText(text);
+      if (ok) showToast(`Copied ${count} item name${count !== 1 ? 's' : ''}`, 'success');
+      else showToast('Copy failed — select the text and copy it manually', 'error');
+    });
+
+    document.getElementById('reorder-bulk-add').addEventListener('click', async () => {
+      const bulkBtn = document.getElementById('reorder-bulk-add');
+      bulkBtn.disabled = true;
+      try {
+        await refreshPendingRequests();
+        const toAdd = getReorderRows().filter(r => !r.requested);
+        if (!toAdd.length) {
+          showToast('Nothing to add — everything shown is already on the request list', 'warning');
+          return;
+        }
+        if (!confirm(`Add ${toAdd.length} item${toAdd.length !== 1 ? 's' : ''} to the Request Stock list?`)) return;
+        await addRequestStock(toAdd.map(r => ({
+          item_name: r.item.name,
+          item_id: r.item.id,
+          requested_by: currentUser.email,
+        })));
+        showToast(`Added ${toAdd.length} item${toAdd.length !== 1 ? 's' : ''} to Request Stock`, 'success');
+        await refreshPendingRequests();
+      } catch (err) {
+        showToast('Failed to add requests: ' + err.message, 'error');
+      } finally {
+        renderReorderModal();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshPendingRequests();
+    });
 
     function renderTable() {
       renderLowStockBanner();
@@ -253,10 +480,12 @@
           const already = await hasPendingRequest(id);
           if (already) {
             showToast('Already on the request list', 'warning');
+            refreshPendingRequests();
             return;
           }
           await addRequestStock({ item_name: item.name, item_id: id, requested_by: currentUser.email });
           showToast('Added to Request Stock list', 'success');
+          refreshPendingRequests();
         } catch (err) {
           showToast('Failed to add request: ' + err.message, 'error');
         }
@@ -358,7 +587,10 @@
     });
 
     wireAuthGate();
-    initAuthGate(loadInventory);
+    initAuthGate(() => {
+      loadInventory();
+      refreshPendingRequests();
+    });
   </script>
 </body>
 </html>

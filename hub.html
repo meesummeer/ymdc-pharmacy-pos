@@ -24,6 +24,7 @@
             <a href="history.html" class="nav-link" data-page="history">History</a>
             <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link active" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+            <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
           </nav>
           <div class="user-area">
             <span class="user-email" id="user-email"></span>
@@ -114,7 +115,7 @@
         </div>
 
         <div class="card">
-          <h3 class="card-title">Item Performance</h3>
+          <h3 class="card-title card-title-row">Item Performance <a href="analytics.html" class="card-title-link">Full analytics →</a></h3>
           <div class="two-col-lists">
             <div>
               <div class="filter-section-title">Top 5 Sellers</div>
@@ -206,20 +207,6 @@
       const year = parts.find(p => p.type === 'year').value;
       const month = parts.find(p => p.type === 'month').value;
       return `${year}-${month}`;
-    }
-
-    function formatRangeLabel(from, to) {
-      if (!from && !to) return 'All Time';
-      const f = parseDMYParts(from);
-      const t = parseDMYParts(to);
-      if (!f || !t) return `${from} – ${to}`;
-      const monthName = (parts) => MONTH_NAMES[parts.month - 1];
-      const sameMonth = f.year === t.year && f.month === t.month;
-      const sameDay = sameMonth && f.day === t.day;
-      if (sameDay) return `${monthName(f)} ${f.day}, ${f.year}`;
-      if (sameMonth) return `${monthName(f)} ${f.day}–${t.day}, ${f.year}`;
-      if (f.year === t.year) return `${monthName(f)} ${f.day} – ${monthName(t)} ${t.day}, ${f.year}`;
-      return `${monthName(f)} ${f.day}, ${f.year} – ${monthName(t)} ${t.day}, ${t.year}`;
     }
 
     function getFilteredHubInvoices() {

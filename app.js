@@ -145,6 +145,12 @@ async function fetchRequestStock() {
   );
 }
 
+async function fetchPendingRequests() {
+  return fetchAllPages(() =>
+    db.from('request_stock').select('id, item_id, item_name').eq('status', 'pending').order('id')
+  );
+}
+
 async function hasPendingRequest(itemId) {
   const { data, error } = await db
     .from('request_stock')
@@ -392,6 +398,20 @@ function getDateRangePreset(preset) {
     case 'last-month': return getLastMonthRange();
     default: return getCurrentMonthRange();
   }
+}
+
+function formatRangeLabel(from, to) {
+  if (!from && !to) return 'All Time';
+  const f = parseDMYParts(from);
+  const t = parseDMYParts(to);
+  if (!f || !t) return `${from} – ${to}`;
+  const monthName = (parts) => MONTH_NAMES[parts.month - 1];
+  const sameMonth = f.year === t.year && f.month === t.month;
+  const sameDay = sameMonth && f.day === t.day;
+  if (sameDay) return `${monthName(f)} ${f.day}, ${f.year}`;
+  if (sameMonth) return `${monthName(f)} ${f.day}–${t.day}, ${f.year}`;
+  if (f.year === t.year) return `${monthName(f)} ${f.day} – ${monthName(t)} ${t.day}, ${f.year}`;
+  return `${monthName(f)} ${f.day}, ${f.year} – ${monthName(t)} ${t.day}, ${t.year}`;
 }
 
 const ALL_CATEGORIES = ['Medicine', 'Snack', 'Other'];
