@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Request Stock — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261008">
+  <link rel="stylesheet" href="style.css?v=20261008-2">
 </head>
 <body>
   <div class="page-wrapper">
@@ -60,6 +60,29 @@
       <div id="page-content" style="display:none">
         <h2 class="page-title">Request Stock</h2>
 
+        <div class="card" id="vendor-section" data-role="admin-only" style="display:none">
+          <h3 class="card-title">Vendor order lists</h3>
+          <div class="cat-tabs" id="vendor-tabs" role="tablist"></div>
+          <div class="reorder-controls">
+            <div class="preset-pills" id="vendor-chips">
+              <button type="button" class="preset-pill" data-chip="all">All</button>
+              <button type="button" class="preset-pill" data-chip="not">Not requested</button>
+              <button type="button" class="preset-pill" data-chip="req">Requested</button>
+            </div>
+            <div class="preset-pills" id="vendor-scope">
+              <button type="button" class="preset-pill" data-scope="out">Out of stock only (0)</button>
+              <button type="button" class="preset-pill" data-scope="low" id="vendor-scope-low">Low + out</button>
+            </div>
+          </div>
+          <div class="reorder-list" id="vendor-list"></div>
+          <div class="filter-section-title" id="vendor-names-label">Names to copy</div>
+          <textarea id="vendor-names" class="reorder-names" readonly aria-label="Item names to copy"></textarea>
+          <div class="vendor-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="vendor-bulk-add">Add all 0 not-requested to Request Stock</button>
+            <button type="button" class="btn btn-primary btn-sm" id="vendor-copy">Copy names</button>
+          </div>
+        </div>
+
         <div class="card">
           <h3 class="card-title">Add to Request List</h3>
           <div class="form-group">
@@ -106,7 +129,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261008"></script>
+  <script src="app.js?v=20261008-2"></script>
   <script>
     let allRequests = [];
     let inventoryForSearch = [];
@@ -143,26 +166,158 @@
       `;
     }
 
+    function categoryForRequest(req) {
+      const item = req.item_id
+        ? inventoryForSearch.find(i => i.id === req.item_id)
+        : inventoryForSearch.find(i => normName(i.name) === normName(req.item_name));
+      return item ? normalizeCategory(item.category) : 'Other';
+    }
+
     function renderRequests() {
       if (!allRequests.length) {
         requestBody.innerHTML = '<tr><td colspan="5" class="empty-state">No stock requests yet.</td></tr>';
         return;
       }
-      requestBody.innerHTML = sortRequests(allRequests).map(renderRequestRow).join('');
+      const groups = { Medicine: [], Snack: [], Other: [] };
+      allRequests.forEach(r => groups[categoryForRequest(r)].push(r));
+      requestBody.innerHTML = ALL_CATEGORIES.filter(c => groups[c].length).map(c => {
+        const pending = groups[c].filter(r => r.status === 'pending').length;
+        return `<tr class="group-row"><td colspan="5">${c} <span class="group-row-count">· ${pending} pending</span></td></tr>`
+          + sortRequests(groups[c]).map(renderRequestRow).join('');
+      }).join('');
     }
 
-    async function loadRequests() {
-      requestBody.innerHTML = '<tr><td colspan="5" class="loading">Loading requests</td></tr>';
+    // ── Vendor order lists (admin) ──────────────────────────────────
+    const VENDOR_TAB_KEY = 'vendor-tab';
+    let vendorTab = ALL_CATEGORIES.includes(getSessionPref(VENDOR_TAB_KEY)) ? getSessionPref(VENDOR_TAB_KEY) : 'Medicine';
+    let vendorChip = 'all';
+    let vendorScope = 'low';
+
+    const vendorTabs = document.getElementById('vendor-tabs');
+    const vendorList = document.getElementById('vendor-list');
+    const vendorNames = document.getElementById('vendor-names');
+
+    function getPending() {
+      return allRequests.filter(r => r.status === 'pending');
+    }
+
+    function getVendorRows() {
+      const groups = lowStockByCategory(inventoryForSearch, getPending(), vendorScope === 'out' ? 0 : LOW_STOCK_THRESHOLD);
+      return groups[vendorTab].filter(r => vendorChip === 'all' || (vendorChip === 'not' ? !r.requested : r.requested));
+    }
+
+    function renderVendorSection() {
+      if (currentRole !== 'admin') return;
+      const lowByCat = lowStockByCategory(inventoryForSearch, getPending());
+      const cats = lowByCat.Other.length ? ALL_CATEGORIES : ['Medicine', 'Snack'];
+      if (!cats.includes(vendorTab)) vendorTab = 'Medicine';
+
+      vendorTabs.innerHTML = cats.map(c => `
+        <button type="button" class="cat-tab${c === vendorTab ? ' active' : ''}" role="tab" aria-selected="${c === vendorTab}" data-tab="${c}">${c === 'Other' ? 'Other' : c + ' vendor'} <span class="cat-tab-count">(${lowByCat[c].length})</span></button>
+      `).join('');
+      document.querySelectorAll('#vendor-chips .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.chip === vendorChip));
+      document.querySelectorAll('#vendor-scope .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.scope === vendorScope));
+      document.getElementById('vendor-scope-low').textContent = `Low + out (≤ ${LOW_STOCK_THRESHOLD})`;
+
+      const rows = getVendorRows();
+      vendorList.innerHTML = rows.length
+        ? rows.map(r => {
+            const qty = r.item.quantity || 0;
+            return `<div class="reorder-row">
+              <span class="reorder-row-name" title="${escapeHtml(r.item.name)}">${escapeHtml(r.item.name)}</span>
+              <span class="reorder-row-qty${qty === 0 ? ' zero' : ''}">${qty}</span>
+              <span class="pill ${r.requested ? 'pill-requested' : 'pill-not-requested'}">${r.requested ? 'Requested' : 'Not requested'}</span>
+            </div>`;
+          }).join('')
+        : '<div class="empty-state" style="padding:28px 16px"><p>Nothing matches.</p></div>';
+
+      const names = rows.map(r => String(r.item.name).replace(/\s*\n\s*/g, ' ').trim());
+      vendorNames.value = names.join('\n');
+      document.getElementById('vendor-names-label').textContent = `Names to copy · ${names.length} item${names.length !== 1 ? 's' : ''}`;
+
+      const notRequestedCount = rows.filter(r => !r.requested).length;
+      const bulkBtn = document.getElementById('vendor-bulk-add');
+      bulkBtn.textContent = `Add all ${notRequestedCount} not-requested to Request Stock`;
+      bulkBtn.disabled = notRequestedCount === 0;
+      document.getElementById('vendor-copy').disabled = names.length === 0;
+    }
+
+    vendorTabs.addEventListener('click', (e) => {
+      const tab = e.target.closest('.cat-tab');
+      if (!tab) return;
+      vendorTab = tab.dataset.tab;
+      setSessionPref(VENDOR_TAB_KEY, vendorTab);
+      renderVendorSection();
+    });
+
+    document.getElementById('vendor-chips').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      vendorChip = pill.dataset.chip;
+      renderVendorSection();
+    });
+
+    document.getElementById('vendor-scope').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      vendorScope = pill.dataset.scope;
+      renderVendorSection();
+    });
+
+    document.getElementById('vendor-copy').addEventListener('click', async () => {
+      const text = vendorNames.value;
+      const count = text ? text.split('\n').length : 0;
+      if (!count) {
+        showToast('Nothing to copy', 'warning');
+        return;
+      }
+      const ok = await copyText(text);
+      if (ok) showToast(`Copied ${count} item name${count !== 1 ? 's' : ''}`, 'success');
+      else showToast('Copy failed — select the text and copy it manually', 'error');
+    });
+
+    document.getElementById('vendor-bulk-add').addEventListener('click', async () => {
+      const bulkBtn = document.getElementById('vendor-bulk-add');
+      bulkBtn.disabled = true;
+      try {
+        await loadRequests(true);
+        const toAdd = getVendorRows().filter(r => !r.requested);
+        if (!toAdd.length) {
+          showToast('Nothing to add — everything shown is already on the request list', 'warning');
+          return;
+        }
+        if (!confirm(`Add ${toAdd.length} ${vendorTab.toLowerCase()} item${toAdd.length !== 1 ? 's' : ''} to the Request Stock list?`)) return;
+        await addRequestStock(toAdd.map(r => ({
+          item_name: r.item.name,
+          item_id: r.item.id,
+          requested_by: currentUser.email,
+        })));
+        showToast(`Added ${toAdd.length} item${toAdd.length !== 1 ? 's' : ''} to Request Stock`, 'success');
+        await loadRequests(true);
+      } catch (err) {
+        showToast('Failed to add requests: ' + err.message, 'error');
+      } finally {
+        renderVendorSection();
+      }
+    });
+
+    async function loadRequests(silent) {
+      if (!silent) requestBody.innerHTML = '<tr><td colspan="5" class="loading">Loading requests</td></tr>';
       try {
         const [requests, inv] = await Promise.all([fetchRequestStock(), fetchInventory()]);
         allRequests = requests;
         inventoryForSearch = inv;
         renderRequests();
+        renderVendorSection();
       } catch (err) {
-        requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+        if (!silent) requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
         showToast('Failed to load requests: ' + err.message, 'error');
       }
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && currentUser) loadRequests(true);
+    });
 
     async function submitRequest({ item_name, item_id }) {
       if (item_id) {

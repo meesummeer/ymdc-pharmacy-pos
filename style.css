@@ -1342,30 +1342,76 @@ input.input-error {
 
 /* ── Needs-reorder (admin inventory) ─────────────────────────────── */
 .low-stock-admin-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed rgba(201, 168, 76, 0.55);
 }
 
-.banner-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
+.low-stock-admin-row > div { margin-bottom: 2px; }
+
+.low-stock-admin-link {
+  display: inline-block;
+  margin-top: 6px;
   font-weight: 700;
   color: var(--navy);
   text-decoration: underline;
+}
+
+.low-stock-admin-link:hover { color: var(--navy-hover); }
+
+/* Category tabs (Inventory + Request Stock vendor lists) */
+.cat-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cat-tab {
+  padding: 9px 16px;
+  margin-bottom: -1px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
-.banner-link:hover { color: var(--navy-hover); }
+.cat-tab:hover { color: var(--navy); }
 
-.reorder-modal .modal { max-width: 640px; }
+.cat-tab.active {
+  color: var(--navy);
+  border-bottom-color: var(--gold);
+}
+
+.cat-tab-count { font-weight: 500; }
+
+/* Vendor order lists (Request Stock, admin) */
+.vendor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.group-row td {
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--navy);
+}
+
+.group-row .group-row-count {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
 
 .reorder-controls {
   display: flex;

@@ -465,6 +465,80 @@ function categoryClass(cat) {
   return 'other';
 }
 
+// ── Low stock / request-list helpers (Inventory + Request Stock) ──
+const LOW_STOCK_THRESHOLD = 5;
+
+function normalizeCategory(cat) {
+  const c = String(cat || '').trim().toLowerCase();
+  if (c === 'medicine') return 'Medicine';
+  if (c === 'snack') return 'Snack';
+  return 'Other';
+}
+
+function normName(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
+// An item counts as requested if a pending row has its item_id, or (for rows with no item_id) the same name.
+function buildRequestedIndex(pending) {
+  const ids = new Set();
+  const names = new Set();
+  pending.forEach(r => {
+    if (r.item_id) ids.add(r.item_id);
+    else if (r.item_name) names.add(normName(r.item_name));
+  });
+  return { ids, names };
+}
+
+function isRequested(item, idx) {
+  return idx.ids.has(item.id) || idx.names.has(normName(item.name));
+}
+
+// Items at or under `limit`, grouped by category, each group sorted by name: { Medicine: [{item, requested}], Snack: [...], Other: [...] }
+function lowStockByCategory(items, pending, limit = LOW_STOCK_THRESHOLD) {
+  const idx = buildRequestedIndex(pending);
+  const groups = { Medicine: [], Snack: [], Other: [] };
+  items.forEach(item => {
+    if ((item.quantity || 0) <= limit) {
+      groups[normalizeCategory(item.category)].push({ item, requested: isRequested(item, idx) });
+    }
+  });
+  ALL_CATEGORIES.forEach(c => {
+    groups[c].sort((a, b) => String(a.item.name).localeCompare(String(b.item.name), undefined, { sensitivity: 'base' }));
+  });
+  return groups;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (err) {
+    console.warn('navigator.clipboard failed, using fallback:', err);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+function getSessionPref(key) {
+  try { return sessionStorage.getItem(key); } catch (err) { return null; }
+}
+
+function setSessionPref(key, value) {
+  try { sessionStorage.setItem(key, value); } catch (err) { /* storage unavailable — tab just isn't remembered */ }
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
