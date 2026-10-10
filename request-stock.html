@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Request Stock — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261008-2">
+  <link rel="stylesheet" href="style.css?v=20261010">
 </head>
 <body>
   <div class="page-wrapper">
@@ -102,6 +102,10 @@
         </div>
 
         <div class="card" style="padding:0;overflow:hidden">
+          <div class="card-title-row" style="align-items:center;padding:16px 20px 12px">
+            <h3 class="card-title" style="margin:0">Request List</h3>
+            <button type="button" class="btn btn-danger-outline btn-sm" id="btn-remove-all" data-role="admin-only" style="display:none" disabled>Remove all pending</button>
+          </div>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
@@ -127,9 +131,26 @@
     </footer>
   </div>
 
+  <div class="modal-overlay" id="remove-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Remove all pending requests</h3>
+        <button class="modal-close" id="remove-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="remove-message" style="margin:0"></p>
+        <span class="field-error" id="remove-error"></span>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="remove-cancel">Cancel</button>
+        <button class="btn btn-danger" id="remove-confirm">Remove all</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261008-2"></script>
+  <script src="app.js?v=20261010"></script>
   <script>
     let allRequests = [];
     let inventoryForSearch = [];
@@ -139,6 +160,10 @@
     const searchInput = document.getElementById('request-search-input');
     const searchDropdown = document.getElementById('request-search-dropdown');
     const freehandInput = document.getElementById('request-freehand-input');
+    const removeAllBtn = document.getElementById('btn-remove-all');
+    const removeModal = document.getElementById('remove-modal');
+    const removeError = document.getElementById('remove-error');
+    const removeConfirm = document.getElementById('remove-confirm');
 
     setActiveNav('request-stock');
 
@@ -174,6 +199,7 @@
     }
 
     function renderRequests() {
+      removeAllBtn.disabled = getPending().length === 0;
       if (!allRequests.length) {
         requestBody.innerHTML = '<tr><td colspan="5" class="empty-state">No stock requests yet.</td></tr>';
         return;
@@ -314,6 +340,46 @@
         showToast('Failed to load requests: ' + err.message, 'error');
       }
     }
+
+    function closeRemoveModal() {
+      removeModal.classList.remove('open');
+    }
+
+    removeAllBtn.addEventListener('click', async () => {
+      removeAllBtn.disabled = true;
+      await loadRequests(true);
+      const count = getPending().length;
+      removeAllBtn.disabled = count === 0;
+      if (!count) {
+        showToast('No pending requests to remove', 'warning');
+        return;
+      }
+      document.getElementById('remove-message').innerHTML =
+        `Remove all <strong>${count}</strong> pending request${count !== 1 ? 's' : ''}? Fulfilled history is kept. This cannot be undone.`;
+      removeError.classList.remove('visible');
+      removeError.textContent = '';
+      removeModal.classList.add('open');
+    });
+
+    removeConfirm.addEventListener('click', async () => {
+      removeConfirm.disabled = true;
+      removeError.classList.remove('visible');
+      try {
+        const removed = await removeAllPendingRequests();
+        closeRemoveModal();
+        showToast(`Removed ${removed} pending request${removed !== 1 ? 's' : ''}`, 'success');
+        await loadRequests(true);
+      } catch (err) {
+        removeError.textContent = 'Failed to remove: ' + err.message;
+        removeError.classList.add('visible');
+      } finally {
+        removeConfirm.disabled = false;
+      }
+    });
+
+    document.getElementById('remove-cancel').addEventListener('click', closeRemoveModal);
+    document.getElementById('remove-close').addEventListener('click', closeRemoveModal);
+    removeModal.addEventListener('click', (e) => { if (e.target === removeModal) closeRemoveModal(); });
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && currentUser) loadRequests(true);

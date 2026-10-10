@@ -1341,13 +1341,75 @@ input.input-error {
 .toast-warning { border-left-color: var(--gold); }
 
 /* ── Needs-reorder (admin inventory) ─────────────────────────────── */
-.low-stock-admin-row {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(201, 168, 76, 0.55);
+.stock-breakdown {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
 }
 
-.low-stock-admin-row > div { margin-bottom: 2px; }
+.stock-breakdown th,
+.stock-breakdown td {
+  padding: 6px 12px 6px 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.stock-breakdown th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(201, 168, 76, 0.55);
+}
+
+.stock-breakdown th.num,
+.stock-breakdown td.num { text-align: right; }
+
+.stock-breakdown-total td {
+  font-weight: 700;
+  color: var(--text);
+  border-top: 1px solid rgba(201, 168, 76, 0.55);
+}
+
+.stock-num-out,
+.stock-breakdown-total td.stock-num-out { color: var(--error); font-weight: 700; }
+.stock-num-low,
+.stock-breakdown-total td.stock-num-low { color: var(--gold-dark); font-weight: 700; }
+.stock-num-zero { color: var(--text-secondary); }
+
+button.stock-num {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.stock-breakdown-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.request-label {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #047857;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+.btn-danger-outline:hover:not(:disabled) {
+  background: var(--error-bg);
+}
 
 .low-stock-admin-link {
   display: inline-block;

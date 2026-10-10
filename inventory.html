@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261008-2">
+  <link rel="stylesheet" href="style.css?v=20261010">
 </head>
 <body>
   <div class="page-wrapper">
@@ -70,6 +70,11 @@
         <div class="card" style="padding:0;overflow:hidden">
           <div style="padding:20px 24px 12px">
             <input type="text" id="filter-input" placeholder="Filter by name…">
+            <div class="preset-pills" id="stock-chips" data-role="admin-only" style="display:none;margin:12px 0 0">
+              <button type="button" class="preset-pill" data-stock="all">All</button>
+              <button type="button" class="preset-pill" data-stock="out">Out of stock</button>
+              <button type="button" class="preset-pill" data-stock="low">Low stock</button>
+            </div>
           </div>
           <div class="table-wrapper">
             <table class="data-table">
@@ -136,12 +141,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261008-2"></script>
+  <script src="app.js?v=20261010"></script>
   <script>
     const TAB_PREF_KEY = 'inventory-tab';
 
     let allItems = [];
     let filterText = '';
+    let stockFilter = 'all';
+    let inventoryLoaded = false;
     let activeTab = ALL_CATEGORIES.includes(getSessionPref(TAB_PREF_KEY)) ? getSessionPref(TAB_PREF_KEY) : 'Medicine';
 
     const inventoryBody = document.getElementById('inventory-body');
@@ -164,6 +171,7 @@
       inventoryBody.innerHTML = '<tr><td colspan="5" class="loading">Loading inventory</td></tr>';
       try {
         allItems = await fetchInventory();
+        inventoryLoaded = true;
         renderTable();
       } catch (err) {
         inventoryBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
@@ -171,10 +179,17 @@
       }
     }
 
+    function matchesStockFilter(item) {
+      if (currentRole !== 'admin' || stockFilter === 'all') return true;
+      const qty = item.quantity || 0;
+      return stockFilter === 'out' ? qty <= 0 : (qty > 0 && qty <= LOW_STOCK_THRESHOLD);
+    }
+
     function getFiltered() {
       const q = filterText.toLowerCase();
       return allItems.filter(item =>
         normalizeCategory(item.category) === activeTab &&
+        matchesStockFilter(item) &&
         (!q || item.name.toLowerCase().includes(q))
       );
     }
@@ -196,30 +211,89 @@
         lowStockBanner.innerHTML = '';
         return;
       }
+      if (currentRole === 'admin') {
+        lowStockBanner.innerHTML = renderStockBreakdown();
+        lowStockBanner.style.display = 'block';
+        return;
+      }
       const shown = lowItems.slice(0, 5);
       const remainder = lowItems.length - shown.length;
       const namesText = shown.map(item => `${escapeHtml(item.name)} (${item.quantity || 0})`).join(', ');
-      let html = `⚠ <strong>${lowItems.length}</strong> item${lowItems.length !== 1 ? 's' : ''} low in stock: ${namesText}${remainder > 0 ? ` and ${remainder} more` : ''}`;
-      if (currentRole === 'admin') html += renderAdminReorderRow(lowItems);
-      lowStockBanner.innerHTML = html;
+      lowStockBanner.innerHTML = `⚠ <strong>${lowItems.length}</strong> item${lowItems.length !== 1 ? 's' : ''} low in stock: ${namesText}${remainder > 0 ? ` and ${remainder} more` : ''}`;
       lowStockBanner.style.display = 'block';
     }
 
-    function renderAdminReorderRow(lowItems) {
-      const link = '<a class="low-stock-admin-link" href="request-stock.html">Open Request Stock →</a>';
-      if (pendingState === 'loading') {
-        return `<div class="low-stock-admin-row"><div>Checking request list…</div>${link}</div>`;
-      }
-      if (pendingState === 'error') {
-        return `<div class="low-stock-admin-row"><div>Request list unavailable — reload to retry.</div>${link}</div>`;
-      }
-      const byCat = lowStockByCategory(lowItems, pendingRequests);
-      const lines = ALL_CATEGORIES.filter(c => byCat[c].length).map(c => {
-        const requested = byCat[c].filter(r => r.requested).length;
-        return `<div>${c}: <strong>${byCat[c].length}</strong> low · ${requested} requested · ${byCat[c].length - requested} not requested</div>`;
+    function renderStockBreakdown() {
+      const byCat = lowStockByCategory(allItems, pendingRequests);
+      const cats = ALL_CATEGORIES.filter(c => c !== 'Other' || byCat.Other.length);
+      const stats = cats.map(c => {
+        const list = byCat[c];
+        const out = list.filter(r => (r.item.quantity || 0) <= 0).length;
+        const requested = list.filter(r => r.requested).length;
+        return { cat: c, out, low: list.length - out, total: list.length, requested, notRequested: list.length - requested };
       });
-      return `<div class="low-stock-admin-row">${lines.join('')}${link}</div>`;
+      const sum = key => stats.reduce((n, st) => n + st[key], 0);
+      // Requested counts aren't known until the request list has loaded
+      const reqCell = n => pendingState === 'ready' ? n : (pendingState === 'loading' ? '…' : '—');
+      const stockNum = (n, cat, kind) => n > 0
+        ? `<button type="button" class="stock-num stock-num-${kind}" data-cat="${cat}" data-stock="${kind}" title="Show ${kind === 'out' ? 'out of stock' : 'low stock'} ${cat.toLowerCase()} items">${n}</button>`
+        : `<span class="stock-num-zero">0</span>`;
+
+      const rows = stats.map(st => `
+        <tr>
+          <td>${st.cat}</td>
+          <td class="num">${stockNum(st.out, st.cat, 'out')}</td>
+          <td class="num">${stockNum(st.low, st.cat, 'low')}</td>
+          <td class="num">${st.total}</td>
+          <td class="num">${reqCell(st.requested)}</td>
+          <td class="num">${reqCell(st.notRequested)}</td>
+        </tr>`).join('');
+      const totalRow = `
+        <tr class="stock-breakdown-total">
+          <td>Total</td>
+          <td class="num stock-num-out">${sum('out')}</td>
+          <td class="num stock-num-low">${sum('low')}</td>
+          <td class="num">${sum('total')}</td>
+          <td class="num">${reqCell(sum('requested'))}</td>
+          <td class="num">${reqCell(sum('notRequested'))}</td>
+        </tr>`;
+      const note = pendingState === 'error' ? '<div class="stock-breakdown-note">Request list unavailable — reload to retry.</div>' : '';
+
+      return `
+        <div class="table-wrapper">
+          <table class="stock-breakdown">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="num">Out (0)</th>
+                <th class="num">Low (1–${LOW_STOCK_THRESHOLD})</th>
+                <th class="num">Total</th>
+                <th class="num">Requested</th>
+                <th class="num">Not requested</th>
+              </tr>
+            </thead>
+            <tbody>${rows}${totalRow}</tbody>
+          </table>
+        </div>
+        ${note}
+        <a class="low-stock-admin-link" href="request-stock.html">Open Request Stock →</a>`;
     }
+
+    lowStockBanner.addEventListener('click', (e) => {
+      const btn = e.target.closest('.stock-num');
+      if (!btn) return;
+      activeTab = btn.dataset.cat;
+      stockFilter = btn.dataset.stock;
+      setSessionPref(TAB_PREF_KEY, activeTab);
+      renderTable();
+    });
+
+    document.getElementById('stock-chips').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      stockFilter = pill.dataset.stock;
+      renderTable();
+    });
 
     async function refreshPendingRequests() {
       if (currentRole !== 'admin') return;
@@ -233,7 +307,7 @@
           showToast('Failed to load request list: ' + err.message, 'error');
         }
       }
-      renderLowStockBanner();
+      if (inventoryLoaded) renderTable();
     }
 
     inventoryTabs.addEventListener('click', (e) => {
@@ -251,19 +325,22 @@
     function renderTable() {
       renderLowStockBanner();
       renderTabs();
+      document.querySelectorAll('#stock-chips .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.stock === stockFilter));
       const items = getFiltered();
       if (!items.length) {
-        inventoryBody.innerHTML = `<tr><td colspan="5" class="empty-state">${filterText ? 'No items found.' : `No ${activeTab.toLowerCase()} items.`}</td></tr>`;
+        const filtered = filterText || (currentRole === 'admin' && stockFilter !== 'all');
+        inventoryBody.innerHTML = `<tr><td colspan="5" class="empty-state">${filtered ? 'No items found.' : `No ${activeTab.toLowerCase()} items.`}</td></tr>`;
         return;
       }
       const isAdmin = currentRole === 'admin';
       const isPharmacist = currentRole === 'pharmacist';
+      const requestMap = isAdmin ? buildRequestMap(pendingRequests, allItems) : null;
       inventoryBody.innerHTML = items.map(item => {
         const qty = item.quantity || 0;
         const isLowStock = qty <= LOW_STOCK_THRESHOLD;
         return `
         <tr data-id="${escapeHtml(item.id)}">
-          <td><strong>${escapeHtml(item.name)}</strong></td>
+          <td><strong>${escapeHtml(item.name)}</strong>${requestMap && requestMap.has(item.id) ? `<div class="request-label">Added in Request List · on ${escapeHtml(formatDateTimeDisplay(requestMap.get(item.id)))}</div>` : ''}</td>
           <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category)}</span></td>
           <td class="num">
             <div class="qty-controls">

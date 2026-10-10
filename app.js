@@ -146,9 +146,24 @@ async function fetchRequestStock() {
 }
 
 async function fetchPendingRequests() {
+  // requested_at alone ties for rows from one bulk insert, so id is the tie-breaker that keeps paging stable
   return fetchAllPages(() =>
-    db.from('request_stock').select('id, item_id, item_name').eq('status', 'pending').order('id')
+    db.from('request_stock')
+      .select('item_id, item_name, requested_at')
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: true })
+      .order('id', { ascending: true })
   );
+}
+
+// Deletes every PENDING request (never fulfilled history) and returns how many rows were removed.
+async function removeAllPendingRequests() {
+  const { error, count } = await db
+    .from('request_stock')
+    .delete({ count: 'exact' })
+    .eq('status', 'pending');
+  if (error) throw new Error(error.message);
+  return count || 0;
 }
 
 async function hasPendingRequest(itemId) {
@@ -458,6 +473,11 @@ function formatTimeDisplay(timeVal) {
   return s;
 }
 
+// "10/10/2026, 12:45 PM" (Asia/Karachi), built from the same formatters the request list uses.
+function formatDateTimeDisplay(ts) {
+  return `${formatSoldAtDate(ts)}, ${formatTimeDisplay(ts)}`;
+}
+
 function categoryClass(cat) {
   const c = String(cat || '').toLowerCase();
   if (c === 'medicine') return 'medicine';
@@ -492,6 +512,28 @@ function buildRequestedIndex(pending) {
 
 function isRequested(item, idx) {
   return idx.ids.has(item.id) || idx.names.has(normName(item.name));
+}
+
+// Map<inventory item id, earliest requested_at> using the same matching rule as isRequested.
+function buildRequestMap(pendingRows, inventoryItems) {
+  const byId = new Map();
+  const byName = new Map();
+  const keepEarliest = (map, key, at) => {
+    const cur = map.get(key);
+    if (cur === undefined || new Date(at) < new Date(cur)) map.set(key, at);
+  };
+  pendingRows.forEach(r => {
+    if (r.item_id) keepEarliest(byId, r.item_id, r.requested_at);
+    else if (r.item_name) keepEarliest(byName, normName(r.item_name), r.requested_at);
+  });
+  const result = new Map();
+  inventoryItems.forEach(item => {
+    let at = byId.get(item.id);
+    const nameAt = byName.get(normName(item.name));
+    if (nameAt !== undefined && (at === undefined || new Date(nameAt) < new Date(at))) at = nameAt;
+    if (at !== undefined) result.set(item.id, at);
+  });
+  return result;
 }
 
 // Items at or under `limit`, grouped by category, each group sorted by name: { Medicine: [{item, requested}], Snack: [...], Other: [...] }
