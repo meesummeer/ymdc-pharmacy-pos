@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Request Stock — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261010">
+  <link rel="stylesheet" href="style.css?v=20261012">
 </head>
 <body>
   <div class="page-wrapper">
@@ -64,22 +64,18 @@
           <h3 class="card-title">Vendor order lists</h3>
           <div class="cat-tabs" id="vendor-tabs" role="tablist"></div>
           <div class="reorder-controls">
-            <div class="preset-pills" id="vendor-chips">
-              <button type="button" class="preset-pill" data-chip="all">All</button>
-              <button type="button" class="preset-pill" data-chip="not">Not requested</button>
-              <button type="button" class="preset-pill" data-chip="req">Requested</button>
-            </div>
             <div class="preset-pills" id="vendor-scope">
               <button type="button" class="preset-pill" data-scope="out">Out of stock only (0)</button>
               <button type="button" class="preset-pill" data-scope="low" id="vendor-scope-low">Low + out</button>
             </div>
           </div>
           <div class="reorder-list" id="vendor-list"></div>
-          <div class="filter-section-title" id="vendor-names-label">Names to copy</div>
-          <textarea id="vendor-names" class="reorder-names" readonly aria-label="Item names to copy"></textarea>
-          <div class="vendor-actions">
-            <button type="button" class="btn btn-secondary btn-sm" id="vendor-bulk-add">Add all 0 not-requested to Request Stock</button>
-            <button type="button" class="btn btn-primary btn-sm" id="vendor-copy">Copy names</button>
+          <div id="vendor-copy-block">
+            <div class="filter-section-title" id="vendor-names-label">Names to copy</div>
+            <textarea id="vendor-names" class="reorder-names" readonly aria-label="Item names to copy"></textarea>
+            <div class="vendor-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="vendor-copy">Copy names</button>
+            </div>
           </div>
         </div>
 
@@ -150,7 +146,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261010"></script>
+  <script src="app.js?v=20261012"></script>
   <script>
     let allRequests = [];
     let inventoryForSearch = [];
@@ -213,11 +209,10 @@
       }).join('');
     }
 
-    // ── Vendor order lists (admin) ──────────────────────────────────
+    // ── Vendor order lists (admin): live view of inventory ───────────
     const VENDOR_TAB_KEY = 'vendor-tab';
     let vendorTab = ALL_CATEGORIES.includes(getSessionPref(VENDOR_TAB_KEY)) ? getSessionPref(VENDOR_TAB_KEY) : 'Medicine';
-    let vendorChip = 'all';
-    let vendorScope = 'low';
+    let vendorScope = 'out';
 
     const vendorTabs = document.getElementById('vendor-tabs');
     const vendorList = document.getElementById('vendor-list');
@@ -227,45 +222,37 @@
       return allRequests.filter(r => r.status === 'pending');
     }
 
-    function getVendorRows() {
-      const groups = lowStockByCategory(inventoryForSearch, getPending(), vendorScope === 'out' ? 0 : LOW_STOCK_THRESHOLD);
-      return groups[vendorTab].filter(r => vendorChip === 'all' || (vendorChip === 'not' ? !r.requested : r.requested));
+    function vendorLimit() {
+      return vendorScope === 'out' ? 0 : LOW_STOCK_THRESHOLD;
     }
 
     function renderVendorSection() {
       if (currentRole !== 'admin') return;
-      const lowByCat = lowStockByCategory(inventoryForSearch, getPending());
-      const cats = lowByCat.Other.length ? ALL_CATEGORIES : ['Medicine', 'Snack'];
+      const byCat = lowStockByCategory(inventoryForSearch, vendorLimit());
+      const cats = byCat.Other.length ? ALL_CATEGORIES : ['Medicine', 'Snack'];
       if (!cats.includes(vendorTab)) vendorTab = 'Medicine';
 
       vendorTabs.innerHTML = cats.map(c => `
-        <button type="button" class="cat-tab${c === vendorTab ? ' active' : ''}" role="tab" aria-selected="${c === vendorTab}" data-tab="${c}">${c === 'Other' ? 'Other' : c + ' vendor'} <span class="cat-tab-count">(${lowByCat[c].length})</span></button>
+        <button type="button" class="cat-tab${c === vendorTab ? ' active' : ''}" role="tab" aria-selected="${c === vendorTab}" data-tab="${c}">${c === 'Other' ? 'Other' : c + ' vendor'} <span class="cat-tab-count">(${byCat[c].length})</span></button>
       `).join('');
-      document.querySelectorAll('#vendor-chips .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.chip === vendorChip));
       document.querySelectorAll('#vendor-scope .preset-pill').forEach(p => p.classList.toggle('active', p.dataset.scope === vendorScope));
       document.getElementById('vendor-scope-low').textContent = `Low + out (≤ ${LOW_STOCK_THRESHOLD})`;
 
-      const rows = getVendorRows();
-      vendorList.innerHTML = rows.length
-        ? rows.map(r => {
-            const qty = r.item.quantity || 0;
+      const items = byCat[vendorTab];
+      vendorList.innerHTML = items.length
+        ? items.map(item => {
+            const qty = item.quantity || 0;
             return `<div class="reorder-row">
-              <span class="reorder-row-name" title="${escapeHtml(r.item.name)}">${escapeHtml(r.item.name)}</span>
+              <span class="reorder-row-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
               <span class="reorder-row-qty${qty === 0 ? ' zero' : ''}">${qty}</span>
-              <span class="pill ${r.requested ? 'pill-requested' : 'pill-not-requested'}">${r.requested ? 'Requested' : 'Not requested'}</span>
             </div>`;
           }).join('')
-        : '<div class="empty-state" style="padding:28px 16px"><p>Nothing matches.</p></div>';
+        : `<div class="empty-state" style="padding:28px 16px"><p>${vendorScope === 'out' ? 'Nothing out of stock' : 'Nothing low or out of stock'} 🎉</p></div>`;
 
-      const names = rows.map(r => String(r.item.name).replace(/\s*\n\s*/g, ' ').trim());
+      const names = items.map(item => String(item.name).replace(/\s*\n\s*/g, ' ').trim());
       vendorNames.value = names.join('\n');
       document.getElementById('vendor-names-label').textContent = `Names to copy · ${names.length} item${names.length !== 1 ? 's' : ''}`;
-
-      const notRequestedCount = rows.filter(r => !r.requested).length;
-      const bulkBtn = document.getElementById('vendor-bulk-add');
-      bulkBtn.textContent = `Add all ${notRequestedCount} not-requested to Request Stock`;
-      bulkBtn.disabled = notRequestedCount === 0;
-      document.getElementById('vendor-copy').disabled = names.length === 0;
+      document.getElementById('vendor-copy-block').style.display = names.length ? '' : 'none';
     }
 
     vendorTabs.addEventListener('click', (e) => {
@@ -273,13 +260,6 @@
       if (!tab) return;
       vendorTab = tab.dataset.tab;
       setSessionPref(VENDOR_TAB_KEY, vendorTab);
-      renderVendorSection();
-    });
-
-    document.getElementById('vendor-chips').addEventListener('click', (e) => {
-      const pill = e.target.closest('.preset-pill');
-      if (!pill) return;
-      vendorChip = pill.dataset.chip;
       renderVendorSection();
     });
 
@@ -300,31 +280,6 @@
       const ok = await copyText(text);
       if (ok) showToast(`Copied ${count} item name${count !== 1 ? 's' : ''}`, 'success');
       else showToast('Copy failed — select the text and copy it manually', 'error');
-    });
-
-    document.getElementById('vendor-bulk-add').addEventListener('click', async () => {
-      const bulkBtn = document.getElementById('vendor-bulk-add');
-      bulkBtn.disabled = true;
-      try {
-        await loadRequests(true);
-        const toAdd = getVendorRows().filter(r => !r.requested);
-        if (!toAdd.length) {
-          showToast('Nothing to add — everything shown is already on the request list', 'warning');
-          return;
-        }
-        if (!confirm(`Add ${toAdd.length} ${vendorTab.toLowerCase()} item${toAdd.length !== 1 ? 's' : ''} to the Request Stock list?`)) return;
-        await addRequestStock(toAdd.map(r => ({
-          item_name: r.item.name,
-          item_id: r.item.id,
-          requested_by: currentUser.email,
-        })));
-        showToast(`Added ${toAdd.length} item${toAdd.length !== 1 ? 's' : ''} to Request Stock`, 'success');
-        await loadRequests(true);
-      } catch (err) {
-        showToast('Failed to add requests: ' + err.message, 'error');
-      } finally {
-        renderVendorSection();
-      }
     });
 
     async function loadRequests(silent) {

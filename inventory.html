@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261010">
+  <link rel="stylesheet" href="style.css?v=20261012">
 </head>
 <body>
   <div class="page-wrapper">
@@ -141,22 +141,19 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261010"></script>
+  <script src="app.js?v=20261012"></script>
   <script>
     const TAB_PREF_KEY = 'inventory-tab';
 
     let allItems = [];
     let filterText = '';
     let stockFilter = 'all';
-    let inventoryLoaded = false;
     let activeTab = ALL_CATEGORIES.includes(getSessionPref(TAB_PREF_KEY)) ? getSessionPref(TAB_PREF_KEY) : 'Medicine';
 
     const inventoryBody = document.getElementById('inventory-body');
     const lowStockBanner = document.getElementById('low-stock-banner');
     const inventoryTabs = document.getElementById('inventory-tabs');
 
-    let pendingRequests = [];
-    let pendingState = 'loading';
     const itemModal = document.getElementById('item-modal');
     const modalTitle = document.getElementById('modal-title');
     const editId = document.getElementById('edit-id');
@@ -171,7 +168,6 @@
       inventoryBody.innerHTML = '<tr><td colspan="5" class="loading">Loading inventory</td></tr>';
       try {
         allItems = await fetchInventory();
-        inventoryLoaded = true;
         renderTable();
       } catch (err) {
         inventoryBody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
@@ -195,7 +191,7 @@
     }
 
     function renderTabs() {
-      const lowByCat = lowStockByCategory(allItems, pendingRequests);
+      const lowByCat = lowStockByCategory(allItems);
       const hasOther = allItems.some(i => normalizeCategory(i.category) === 'Other');
       const cats = hasOther ? ALL_CATEGORIES : ['Medicine', 'Snack'];
       if (!cats.includes(activeTab)) activeTab = 'Medicine';
@@ -224,17 +220,14 @@
     }
 
     function renderStockBreakdown() {
-      const byCat = lowStockByCategory(allItems, pendingRequests);
+      const byCat = lowStockByCategory(allItems);
       const cats = ALL_CATEGORIES.filter(c => c !== 'Other' || byCat.Other.length);
       const stats = cats.map(c => {
         const list = byCat[c];
-        const out = list.filter(r => (r.item.quantity || 0) <= 0).length;
-        const requested = list.filter(r => r.requested).length;
-        return { cat: c, out, low: list.length - out, total: list.length, requested, notRequested: list.length - requested };
+        const out = list.filter(item => (item.quantity || 0) <= 0).length;
+        return { cat: c, out, low: list.length - out, total: list.length };
       });
       const sum = key => stats.reduce((n, st) => n + st[key], 0);
-      // Requested counts aren't known until the request list has loaded
-      const reqCell = n => pendingState === 'ready' ? n : (pendingState === 'loading' ? '…' : '—');
       const stockNum = (n, cat, kind) => n > 0
         ? `<button type="button" class="stock-num stock-num-${kind}" data-cat="${cat}" data-stock="${kind}" title="Show ${kind === 'out' ? 'out of stock' : 'low stock'} ${cat.toLowerCase()} items">${n}</button>`
         : `<span class="stock-num-zero">0</span>`;
@@ -245,8 +238,6 @@
           <td class="num">${stockNum(st.out, st.cat, 'out')}</td>
           <td class="num">${stockNum(st.low, st.cat, 'low')}</td>
           <td class="num">${st.total}</td>
-          <td class="num">${reqCell(st.requested)}</td>
-          <td class="num">${reqCell(st.notRequested)}</td>
         </tr>`).join('');
       const totalRow = `
         <tr class="stock-breakdown-total">
@@ -254,11 +245,7 @@
           <td class="num stock-num-out">${sum('out')}</td>
           <td class="num stock-num-low">${sum('low')}</td>
           <td class="num">${sum('total')}</td>
-          <td class="num">${reqCell(sum('requested'))}</td>
-          <td class="num">${reqCell(sum('notRequested'))}</td>
         </tr>`;
-      const note = pendingState === 'error' ? '<div class="stock-breakdown-note">Request list unavailable — reload to retry.</div>' : '';
-
       return `
         <div class="table-wrapper">
           <table class="stock-breakdown">
@@ -268,14 +255,11 @@
                 <th class="num">Out (0)</th>
                 <th class="num">Low (1–${LOW_STOCK_THRESHOLD})</th>
                 <th class="num">Total</th>
-                <th class="num">Requested</th>
-                <th class="num">Not requested</th>
               </tr>
             </thead>
             <tbody>${rows}${totalRow}</tbody>
           </table>
         </div>
-        ${note}
         <a class="low-stock-admin-link" href="request-stock.html">Open Request Stock →</a>`;
     }
 
@@ -295,31 +279,12 @@
       renderTable();
     });
 
-    async function refreshPendingRequests() {
-      if (currentRole !== 'admin') return;
-      try {
-        pendingRequests = await fetchPendingRequests();
-        pendingState = 'ready';
-      } catch (err) {
-        console.error('Pending requests refresh failed:', err);
-        if (pendingState !== 'ready') {
-          pendingState = 'error';
-          showToast('Failed to load request list: ' + err.message, 'error');
-        }
-      }
-      if (inventoryLoaded) renderTable();
-    }
-
     inventoryTabs.addEventListener('click', (e) => {
       const tab = e.target.closest('.cat-tab');
       if (!tab) return;
       activeTab = tab.dataset.tab;
       setSessionPref(TAB_PREF_KEY, activeTab);
       renderTable();
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) refreshPendingRequests();
     });
 
     function renderTable() {
@@ -334,13 +299,11 @@
       }
       const isAdmin = currentRole === 'admin';
       const isPharmacist = currentRole === 'pharmacist';
-      const requestMap = isAdmin ? buildRequestMap(pendingRequests, allItems) : null;
       inventoryBody.innerHTML = items.map(item => {
         const qty = item.quantity || 0;
-        const isLowStock = qty <= LOW_STOCK_THRESHOLD;
         return `
         <tr data-id="${escapeHtml(item.id)}">
-          <td><strong>${escapeHtml(item.name)}</strong>${requestMap && requestMap.has(item.id) ? `<div class="request-label">Added in Request List · on ${escapeHtml(formatDateTimeDisplay(requestMap.get(item.id)))}</div>` : ''}</td>
+          <td><strong>${escapeHtml(item.name)}</strong></td>
           <td><span class="pill pill-${categoryClass(item.category)}">${escapeHtml(item.category)}</span></td>
           <td class="num">
             <div class="qty-controls">
@@ -352,7 +315,6 @@
           <td class="num">${item.price ? formatPKR(item.price) : '—'}</td>
           <td>
             <div class="row-actions">
-              ${isLowStock ? `<button class="btn-icon-only btn-flag-low-stock" data-id="${escapeHtml(item.id)}" title="Add to Request Stock">🔔</button>` : ''}
               ${(isAdmin || isPharmacist) ? `<button class="btn-icon-only btn-edit" title="${isAdmin ? 'Edit item' : 'Edit price'}">✎</button>` : ''}
               ${isAdmin ? `<button class="btn-icon-only danger btn-delete" title="Delete item">🗑</button>` : ''}
             </div>
@@ -384,27 +346,6 @@
     }
 
     inventoryBody.addEventListener('click', async (e) => {
-      const flagBtn = e.target.closest('.btn-flag-low-stock');
-      if (flagBtn) {
-        const id = flagBtn.dataset.id;
-        const item = allItems.find(i => i.id === id);
-        if (!item) return;
-        try {
-          const already = await hasPendingRequest(id);
-          if (already) {
-            showToast('Already on the request list', 'warning');
-            refreshPendingRequests();
-            return;
-          }
-          await addRequestStock({ item_name: item.name, item_id: id, requested_by: currentUser.email });
-          showToast('Added to Request Stock list', 'success');
-          refreshPendingRequests();
-        } catch (err) {
-          showToast('Failed to add request: ' + err.message, 'error');
-        }
-        return;
-      }
-
       const adjustBtn = e.target.closest('[data-adjust]');
       if (adjustBtn) {
         const id = adjustBtn.dataset.id;
@@ -502,10 +443,7 @@
     });
 
     wireAuthGate();
-    initAuthGate(() => {
-      loadInventory();
-      refreshPendingRequests();
-    });
+    initAuthGate(loadInventory);
   </script>
 </body>
 </html>

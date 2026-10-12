@@ -145,17 +145,6 @@ async function fetchRequestStock() {
   );
 }
 
-async function fetchPendingRequests() {
-  // requested_at alone ties for rows from one bulk insert, so id is the tie-breaker that keeps paging stable
-  return fetchAllPages(() =>
-    db.from('request_stock')
-      .select('item_id, item_name, requested_at')
-      .eq('status', 'pending')
-      .order('requested_at', { ascending: true })
-      .order('id', { ascending: true })
-  );
-}
-
 // Deletes every PENDING request (never fulfilled history) and returns how many rows were removed.
 async function removeAllPendingRequests() {
   const { error, count } = await db
@@ -473,11 +462,6 @@ function formatTimeDisplay(timeVal) {
   return s;
 }
 
-// "10/10/2026, 12:45 PM" (Asia/Karachi), built from the same formatters the request list uses.
-function formatDateTimeDisplay(ts) {
-  return `${formatSoldAtDate(ts)}, ${formatTimeDisplay(ts)}`;
-}
-
 function categoryClass(cat) {
   const c = String(cat || '').toLowerCase();
   if (c === 'medicine') return 'medicine';
@@ -499,54 +483,14 @@ function normName(s) {
   return String(s || '').trim().toLowerCase();
 }
 
-// An item counts as requested if a pending row has its item_id, or (for rows with no item_id) the same name.
-function buildRequestedIndex(pending) {
-  const ids = new Set();
-  const names = new Set();
-  pending.forEach(r => {
-    if (r.item_id) ids.add(r.item_id);
-    else if (r.item_name) names.add(normName(r.item_name));
-  });
-  return { ids, names };
-}
-
-function isRequested(item, idx) {
-  return idx.ids.has(item.id) || idx.names.has(normName(item.name));
-}
-
-// Map<inventory item id, earliest requested_at> using the same matching rule as isRequested.
-function buildRequestMap(pendingRows, inventoryItems) {
-  const byId = new Map();
-  const byName = new Map();
-  const keepEarliest = (map, key, at) => {
-    const cur = map.get(key);
-    if (cur === undefined || new Date(at) < new Date(cur)) map.set(key, at);
-  };
-  pendingRows.forEach(r => {
-    if (r.item_id) keepEarliest(byId, r.item_id, r.requested_at);
-    else if (r.item_name) keepEarliest(byName, normName(r.item_name), r.requested_at);
-  });
-  const result = new Map();
-  inventoryItems.forEach(item => {
-    let at = byId.get(item.id);
-    const nameAt = byName.get(normName(item.name));
-    if (nameAt !== undefined && (at === undefined || new Date(nameAt) < new Date(at))) at = nameAt;
-    if (at !== undefined) result.set(item.id, at);
-  });
-  return result;
-}
-
-// Items at or under `limit`, grouped by category, each group sorted by name: { Medicine: [{item, requested}], Snack: [...], Other: [...] }
-function lowStockByCategory(items, pending, limit = LOW_STOCK_THRESHOLD) {
-  const idx = buildRequestedIndex(pending);
+// Items at or under `limit`, grouped by category and sorted by name: { Medicine: [item], Snack: [item], Other: [item] }
+function lowStockByCategory(items, limit = LOW_STOCK_THRESHOLD) {
   const groups = { Medicine: [], Snack: [], Other: [] };
   items.forEach(item => {
-    if ((item.quantity || 0) <= limit) {
-      groups[normalizeCategory(item.category)].push({ item, requested: isRequested(item, idx) });
-    }
+    if ((item.quantity || 0) <= limit) groups[normalizeCategory(item.category)].push(item);
   });
   ALL_CATEGORIES.forEach(c => {
-    groups[c].sort((a, b) => String(a.item.name).localeCompare(String(b.item.name), undefined, { sensitivity: 'base' }));
+    groups[c].sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }));
   });
   return groups;
 }

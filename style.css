@@ -1389,19 +1389,6 @@ button.stock-num {
   cursor: pointer;
 }
 
-.stock-breakdown-note {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.request-label {
-  margin-top: 2px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #047857;
-}
-
 .btn-danger-outline {
   background: transparent;
   color: var(--error);
@@ -1456,7 +1443,7 @@ button.stock-num {
 .vendor-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   margin-top: 14px;
 }
@@ -1527,16 +1514,6 @@ button.stock-num {
   resize: vertical;
   line-height: 1.5;
   background: var(--bg);
-}
-
-.pill-requested {
-  background: #D1FAE5;
-  color: #047857;
-}
-
-.pill-not-requested {
-  background: rgba(201, 168, 76, 0.18);
-  color: var(--gold-dark);
 }
 
 /* ── Analytics ───────────────────────────────────────────────────── */
