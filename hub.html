@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hub — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261012">
+  <link rel="stylesheet" href="style.css?v=20261022">
 </head>
 <body>
   <div class="page-wrapper">
@@ -25,6 +25,7 @@
             <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link active" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
             <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
+            <a href="expenses.html" class="nav-link" data-page="expenses" data-role="admin-only" style="display:none">Expenses</a>
           </nav>
           <div class="user-area">
             <span class="user-email" id="user-email"></span>
@@ -69,8 +70,25 @@
           </div>
         </div>
 
-        <div class="profit-banner" id="profit-banner">
-          Estimated Profit (13% margin): <strong id="profit-value">PKR 0</strong>
+        <div class="card-grid fin-grid">
+          <div class="card stat-card">
+            <span class="stat-label">Revenue</span>
+            <span class="stat-value" id="fin-revenue">PKR 0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label" id="fin-profit-label">Estimated Profit</span>
+            <span class="stat-value" id="fin-profit">PKR 0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Expenses</span>
+            <span class="stat-value" id="fin-expenses">…</span>
+            <div class="fin-breakdown" id="fin-expense-breakdown"></div>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Net Revenue</span>
+            <span class="stat-value" id="fin-net">…</span>
+            <span class="stat-sub fin-note">Expenses are stock purchases, so a negative figure means more stock bought than sold, not a loss.</span>
+          </div>
         </div>
 
         <div class="card-grid">
@@ -175,11 +193,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261012"></script>
+  <script src="app.js?v=20261022"></script>
   <script>
     setActiveNav('hub');
 
-    const PROFIT_MARGIN = 0.13;
     const CATEGORY_COLORS = {
       Medicine: '#1D4ED8',
       Snack: '#047857',
@@ -191,6 +208,10 @@
     let allRequestStock = [];
     let hubDateFrom = '';
     let hubDateTo = '';
+    let hubRevenue = 0;
+    let hubExpenses = null; // null = loading
+    let hubExpensesError = false;
+    let expenseRequestSeq = 0;
 
     const hubFilterModal = document.getElementById('hub-filter-modal');
 
@@ -501,6 +522,59 @@
       `;
     }
 
+    function sumExpenses(rows, category) {
+      return rows.reduce((sum, e) => (category && e.category !== category ? sum : sum + (Number(e.amount) || 0)), 0);
+    }
+
+    function renderFinanceCards() {
+      document.getElementById('fin-revenue').textContent = formatPKR(hubRevenue);
+      document.getElementById('fin-profit-label').textContent = `Estimated Profit (${Math.round(PROFIT_MARGIN * 100)}%)`;
+      document.getElementById('fin-profit').textContent = formatPKR(hubRevenue * PROFIT_MARGIN);
+
+      const expensesEl = document.getElementById('fin-expenses');
+      const netEl = document.getElementById('fin-net');
+      const breakdownEl = document.getElementById('fin-expense-breakdown');
+      netEl.classList.remove('fin-positive', 'fin-negative');
+      if (!hubExpenses) {
+        const placeholder = hubExpensesError ? '—' : '…';
+        expensesEl.textContent = placeholder;
+        netEl.textContent = placeholder;
+        breakdownEl.innerHTML = '';
+        return;
+      }
+      const total = sumExpenses(hubExpenses);
+      expensesEl.textContent = formatPKR(total);
+
+      const net = hubRevenue - total;
+      netEl.textContent = (net < 0 ? '-' : '') + formatPKR(Math.abs(net));
+      if (net < 0) netEl.classList.add('fin-negative');
+      else if (net > 0) netEl.classList.add('fin-positive');
+
+      const rows = EXPENSE_DISPLAY_ORDER.map(c => [c, sumExpenses(hubExpenses, c)]);
+      const other = total - rows.reduce((n, [, v]) => n + v, 0);
+      if (Math.abs(other) > 0.005) rows.push(['Other', other]);
+      breakdownEl.innerHTML = rows.map(([c, v]) =>
+        `<div class="fin-breakdown-row"><span>${escapeHtml(c)}</span><strong>${formatPKR(v)}</strong></div>`
+      ).join('');
+    }
+
+    async function refreshHubExpenses() {
+      const seq = ++expenseRequestSeq;
+      hubExpenses = null;
+      hubExpensesError = false;
+      renderFinanceCards();
+      try {
+        const rows = await fetchExpenses(dmyToISO(hubDateFrom), dmyToISO(hubDateTo));
+        if (seq !== expenseRequestSeq) return;
+        hubExpenses = rows;
+      } catch (err) {
+        if (seq !== expenseRequestSeq) return;
+        hubExpensesError = true;
+        showToast('Failed to load expenses: ' + err.message, 'error');
+      }
+      renderFinanceCards();
+    }
+
     function renderHub() {
       const invoices = getFilteredHubInvoices();
       const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
@@ -512,7 +586,8 @@
       document.getElementById('stat-bank').textContent = formatPKR(
         invoices.filter(inv => inv.payment_method === 'Bank Transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
       );
-      document.getElementById('profit-value').textContent = formatPKR(totalRevenue * PROFIT_MARGIN);
+      hubRevenue = totalRevenue;
+      renderFinanceCards();
       document.getElementById('hub-range-summary').textContent = formatRangeLabel(hubDateFrom, hubDateTo);
       renderRevenueChart(allHubInvoices);
       renderCategoryPie(getCategoryRevenue());
@@ -541,6 +616,7 @@
         hubDateFrom = range.from;
         hubDateTo = range.to;
         renderHub();
+        refreshHubExpenses();
       } catch (err) {
         showToast('Failed to load Hub data: ' + err.message, 'error');
       }
@@ -574,10 +650,18 @@
     });
 
     document.getElementById('hub-filter-apply').addEventListener('click', () => {
-      hubDateFrom = document.getElementById('hub-date-from').value.trim();
-      hubDateTo = document.getElementById('hub-date-to').value.trim();
+      const from = document.getElementById('hub-date-from').value.trim();
+      const to = document.getElementById('hub-date-to').value.trim();
+      const rangeError = validateDMYRange(from, to);
+      if (rangeError) {
+        showToast(rangeError, 'warning');
+        return;
+      }
+      hubDateFrom = from;
+      hubDateTo = to;
       closeHubFilterModal();
       renderHub();
+      refreshHubExpenses();
     });
 
     wireAuthGate();

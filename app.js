@@ -24,6 +24,10 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
+const EXPENSE_CATEGORIES = ['Beverage', 'Snacks', 'Ice Cream', 'Medicine'];
+const EXPENSE_DISPLAY_ORDER = ['Medicine', ...EXPENSE_CATEGORIES.filter(c => c !== 'Medicine')];
+const PROFIT_MARGIN = 0.25;
+
 // ── Supabase data helpers ──────────────────────────────────────────
 const SUPABASE_PAGE_SIZE = 1000;
 
@@ -143,6 +147,39 @@ async function fetchRequestStock() {
   return fetchAllPages(() =>
     db.from('request_stock').select('*').order('requested_at', { ascending: false })
   );
+}
+
+// Expenses. expense_date is a plain date (YYYY-MM-DD) — compared as a string, never via Date/timezones.
+async function fetchExpenses(fromISO, toISO) {
+  return fetchAllPages(() => {
+    let q = db.from('expenses').select('*');
+    if (fromISO) q = q.gte('expense_date', fromISO);
+    if (toISO) q = q.lte('expense_date', toISO);
+    return q.order('expense_date', { ascending: false }).order('id', { ascending: true });
+  });
+}
+
+async function addExpense({ expense_date, category, amount, note }) {
+  const { error } = await db.from('expenses').insert({
+    expense_date,
+    category,
+    amount,
+    note: note || null,
+    created_by: currentUser.email,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function updateExpense(id, { expense_date, category, amount, note }) {
+  const { error } = await db.from('expenses')
+    .update({ expense_date, category, amount, note: note || null })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteExpense(id) {
+  const { error } = await db.from('expenses').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 // Deletes every PENDING request (never fulfilled history) and returns how many rows were removed.
@@ -355,6 +392,37 @@ function dmyToNumber(parts) {
 
 function parseFilterDate(dmyStr) {
   return parseDMYParts(dmyStr);
+}
+
+// "DD/MM/YYYY" -> "YYYY-MM-DD" by string handling only ('' if empty or not a real calendar date).
+function dmyToISO(dmyStr) {
+  const p = parseDMYParts(dmyStr);
+  if (!p) return '';
+  const probe = new Date(Date.UTC(p.year, p.month - 1, p.day));
+  if (probe.getUTCFullYear() !== p.year || probe.getUTCMonth() !== p.month - 1 || probe.getUTCDate() !== p.day) return '';
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+// "YYYY-MM-DD" (or a timestamp starting with one) -> "DD/MM/YYYY".
+function isoToDMY(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+// Returns an error message for a bad From/To pair of DD/MM/YYYY strings, or null when fine (empty = open-ended).
+function validateDMYRange(from, to) {
+  if ((from && !dmyToISO(from)) || (to && !dmyToISO(to))) return 'Dates must be in DD/MM/YYYY format';
+  if (from && to && dmyToISO(from) > dmyToISO(to)) return '"From" date is after the "To" date';
+  return null;
+}
+
+// Today as "YYYY-MM-DD" for <input type="date">.
+function todayInputValue() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function getCurrentMonthRange() {

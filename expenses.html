@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expenses — YMDC Pharmacy</title>
+  <link rel="stylesheet" href="style.css?v=20261022">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+            <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
+            <a href="expenses.html" class="nav-link active" data-page="expenses" data-role="admin-only" style="display:none">Expenses</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Expenses</h2>
+
+        <div class="card">
+          <h3 class="card-title">Add Expense</h3>
+          <div class="expense-form">
+            <div class="form-group" style="margin-bottom:0">
+              <label for="exp-date" class="form-label">Date</label>
+              <input type="date" id="exp-date" class="input-lg" style="padding-left:16px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Category</label>
+              <div class="preset-pills" id="exp-cat-pills"></div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="exp-amount" class="form-label">Amount (PKR)</label>
+              <input type="number" id="exp-amount" class="input-lg" style="padding-left:16px" min="0" step="0.01" placeholder="0">
+            </div>
+            <div class="form-group span-all" style="margin-bottom:0">
+              <label for="exp-note" class="form-label">Note (optional)</label>
+              <input type="text" id="exp-note" maxlength="200" placeholder="e.g. Supplier name or bill number">
+            </div>
+            <div class="span-all">
+              <button type="button" class="btn btn-primary" id="exp-add">Add Expense</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar card">
+          <div id="exp-summary-label" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
+            Loading…
+          </div>
+          <div class="filter-bar-actions">
+            <button class="btn btn-primary btn-sm" id="exp-btn-open-filter">Filter</button>
+          </div>
+        </div>
+
+        <div class="card-grid expense-summary" id="exp-summary"></div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:16px 20px 4px">
+            <div class="preset-pills" id="exp-cat-chips" style="margin-bottom:12px"></div>
+          </div>
+          <div id="exp-table-wrap">
+            <div class="loading">Loading expenses</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <div class="modal-overlay" id="exp-edit-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Edit Expense</h3>
+        <button class="modal-close" id="exp-edit-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="exp-edit-date" class="form-label">Date</label>
+          <input type="date" id="exp-edit-date">
+        </div>
+        <div class="form-group">
+          <label for="exp-edit-category" class="form-label">Category</label>
+          <select id="exp-edit-category"></select>
+        </div>
+        <div class="form-group">
+          <label for="exp-edit-amount" class="form-label">Amount (PKR)</label>
+          <input type="number" id="exp-edit-amount" min="0" step="0.01">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="exp-edit-note" class="form-label">Note (optional)</label>
+          <input type="text" id="exp-edit-note" maxlength="200">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="exp-edit-cancel">Cancel</button>
+        <button class="btn btn-primary" id="exp-edit-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay filter-modal" id="exp-filter-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Filter Expenses</h3>
+        <button class="modal-close" id="exp-filter-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="filter-section-title">Date Range</div>
+        <div class="form-group">
+          <label for="exp-date-from" class="form-label">From</label>
+          <input type="text" id="exp-date-from" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label for="exp-date-to" class="form-label">To</label>
+          <input type="text" id="exp-date-to" placeholder="DD/MM/YYYY" maxlength="10">
+        </div>
+        <div class="preset-pills" id="exp-preset-pills" style="margin-bottom:0">
+          <button type="button" class="preset-pill" data-preset="today">Today</button>
+          <button type="button" class="preset-pill" data-preset="yesterday">Yesterday</button>
+          <button type="button" class="preset-pill" data-preset="this-week">This Week</button>
+          <button type="button" class="preset-pill" data-preset="this-month">This Month</button>
+          <button type="button" class="preset-pill" data-preset="last-month">Last Month</button>
+          <button type="button" class="preset-pill" data-preset="all-time">All Time</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-spread">
+          <button type="button" class="btn-text" id="exp-filter-cancel">Cancel</button>
+          <div class="modal-footer-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="exp-filter-reset">Reset</button>
+            <button type="button" class="btn btn-primary btn-sm" id="exp-filter-apply">Apply Filters</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js?v=20261022"></script>
+  <script>
+    setActiveNav('expenses');
+
+    const EXPENSE_PILL_CLASS = { Medicine: 'medicine', Snacks: 'snack', Beverage: 'beverage', 'Ice Cream': 'ice-cream' };
+
+    const defaultExpFilters = () => ({ ...getDateRangePreset('this-month'), category: 'all' });
+
+    let expFilters = defaultExpFilters();
+    let expenses = [];
+    let expenseLoadSeq = 0;
+    let addCategory = '';
+    let editingId = null;
+
+    const expFilterModal = document.getElementById('exp-filter-modal');
+    const expEditModal = document.getElementById('exp-edit-modal');
+    const expDate = document.getElementById('exp-date');
+    const expAmount = document.getElementById('exp-amount');
+    const expNote = document.getElementById('exp-note');
+    const expAddBtn = document.getElementById('exp-add');
+
+    const expCatPill = (cat) => `<span class="pill pill-${EXPENSE_PILL_CLASS[cat] || 'other'}">${escapeHtml(cat || '—')}</span>`;
+    const sumAmounts = (rows) => rows.reduce((n, e) => n + (Number(e.amount) || 0), 0);
+
+    // ── Add form ───────────────────────────────────────────────────
+    function renderAddCategoryPills() {
+      document.getElementById('exp-cat-pills').innerHTML = EXPENSE_DISPLAY_ORDER.map(c =>
+        `<button type="button" class="preset-pill${c === addCategory ? ' active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`
+      ).join('');
+    }
+
+    document.getElementById('exp-cat-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      addCategory = pill.dataset.cat;
+      renderAddCategoryPills();
+    });
+
+    // Returns { fields } or { error } for the add / edit forms.
+    function readExpenseFields(date, category, amountRaw, note) {
+      if (!date) return { error: 'Choose a date' };
+      if (!category) return { error: 'Choose a category' };
+      const amount = Math.round(Number(amountRaw) * 100) / 100;
+      if (!amountRaw || !(amount > 0)) return { error: 'Enter an amount greater than 0' };
+      return { fields: { expense_date: date, category, amount, note: String(note || '').trim() } };
+    }
+
+    expAddBtn.addEventListener('click', async () => {
+      const { fields, error } = readExpenseFields(expDate.value, addCategory, expAmount.value, expNote.value);
+      if (error) {
+        showToast(error, 'warning');
+        return;
+      }
+      expAddBtn.disabled = true;
+      try {
+        await addExpense(fields);
+        const from = dmyToISO(expFilters.from);
+        const to = dmyToISO(expFilters.to);
+        const outside = (from && fields.expense_date < from) || (to && fields.expense_date > to);
+        showToast(outside ? 'Expense added (dated outside the current filter range)' : 'Expense added', 'success');
+        expAmount.value = '';
+        expNote.value = '';
+        expAmount.focus();
+        await loadExpenses();
+      } catch (err) {
+        showToast('Failed to add expense: ' + err.message, 'error');
+      } finally {
+        expAddBtn.disabled = false;
+      }
+    });
+
+    // ── List ───────────────────────────────────────────────────────
+    function renderSummary() {
+      const cards = [['Total', sumAmounts(expenses)]];
+      let other = cards[0][1];
+      EXPENSE_DISPLAY_ORDER.forEach(c => {
+        const v = sumAmounts(expenses.filter(e => e.category === c));
+        other -= v;
+        cards.push([c, v]);
+      });
+      if (Math.abs(other) > 0.005) cards.push(['Other', other]);
+      document.getElementById('exp-summary').innerHTML = cards.map(([label, v]) => `
+        <div class="card stat-card">
+          <span class="stat-label">${escapeHtml(label)}</span>
+          <span class="stat-value">${formatPKR(v)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderChips() {
+      const chips = [['all', 'All'], ...EXPENSE_DISPLAY_ORDER.map(c => [c, c])];
+      document.getElementById('exp-cat-chips').innerHTML = chips.map(([key, label]) =>
+        `<button type="button" class="preset-pill${key === expFilters.category ? ' active' : ''}" data-cat="${escapeHtml(key)}">${escapeHtml(label)}</button>`
+      ).join('');
+    }
+
+    function renderExpenseTable() {
+      const wrap = document.getElementById('exp-table-wrap');
+      const rows = expenses.filter(e => expFilters.category === 'all' || e.category === expFilters.category);
+      if (!rows.length) {
+        wrap.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🧾</div><p>No expenses for this range and category.</p></div>';
+        return;
+      }
+      wrap.innerHTML = `
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Note</th>
+                <th class="num">Amount</th>
+                <th style="width:110px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(e => `
+                <tr data-id="${escapeHtml(e.id)}">
+                  <td>${escapeHtml(isoToDMY(e.expense_date))}</td>
+                  <td>${expCatPill(e.category)}</td>
+                  <td class="expense-note-cell">${e.note ? escapeHtml(e.note) : '—'}</td>
+                  <td class="num">${formatPKR(e.amount)}</td>
+                  <td>
+                    <div class="row-actions">
+                      <button class="btn-icon-only btn-edit" title="Edit expense">✎</button>
+                      <button class="btn-icon-only danger btn-delete" title="Delete expense">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3">Total (${rows.length} expense${rows.length !== 1 ? 's' : ''})</td>
+                <td class="num">${formatPKR(sumAmounts(rows))}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderExpenses() {
+      document.getElementById('exp-summary-label').textContent = formatRangeLabel(expFilters.from, expFilters.to);
+      renderSummary();
+      renderChips();
+      renderExpenseTable();
+    }
+
+    async function loadExpenses() {
+      const seq = ++expenseLoadSeq;
+      try {
+        const rows = await fetchExpenses(dmyToISO(expFilters.from), dmyToISO(expFilters.to));
+        if (seq !== expenseLoadSeq) return;
+        expenses = rows;
+        renderExpenses();
+      } catch (err) {
+        if (seq !== expenseLoadSeq) return;
+        document.getElementById('exp-table-wrap').innerHTML = `<div class="empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
+        showToast('Failed to load expenses: ' + err.message, 'error');
+      }
+    }
+
+    document.getElementById('exp-cat-chips').addEventListener('click', (e) => {
+      const chip = e.target.closest('.preset-pill');
+      if (!chip) return;
+      expFilters.category = chip.dataset.cat;
+      renderChips();
+      renderExpenseTable();
+    });
+
+    // ── Edit / delete ──────────────────────────────────────────────
+    function closeEditModal() {
+      expEditModal.classList.remove('open');
+      editingId = null;
+    }
+
+    document.getElementById('exp-edit-category').innerHTML = EXPENSE_DISPLAY_ORDER.map(c =>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join('');
+
+    document.getElementById('exp-table-wrap').addEventListener('click', async (e) => {
+      const row = e.target.closest('tr[data-id]');
+      if (!row) return;
+      const exp = expenses.find(x => x.id === row.dataset.id);
+      if (!exp) return;
+
+      if (e.target.closest('.btn-edit')) {
+        editingId = exp.id;
+        document.getElementById('exp-edit-date').value = String(exp.expense_date).slice(0, 10);
+        const catSelect = document.getElementById('exp-edit-category');
+        // A category outside the known four stays editable instead of silently changing
+        if (!EXPENSE_DISPLAY_ORDER.includes(exp.category) && exp.category) {
+          catSelect.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(exp.category)}">${escapeHtml(exp.category)}</option>`);
+        }
+        catSelect.value = exp.category;
+        document.getElementById('exp-edit-amount').value = exp.amount;
+        document.getElementById('exp-edit-note').value = exp.note || '';
+        expEditModal.classList.add('open');
+      } else if (e.target.closest('.btn-delete')) {
+        const label = `${isoToDMY(exp.expense_date)} · ${exp.category} · ${formatPKR(exp.amount)}`;
+        if (!confirm(`Delete this expense?\n${label}`)) return;
+        try {
+          await deleteExpense(exp.id);
+          showToast('Expense deleted', 'success');
+          await loadExpenses();
+        } catch (err) {
+          showToast('Delete failed: ' + err.message, 'error');
+        }
+      }
+    });
+
+    document.getElementById('exp-edit-close').addEventListener('click', closeEditModal);
+    document.getElementById('exp-edit-cancel').addEventListener('click', closeEditModal);
+    expEditModal.addEventListener('click', (e) => { if (e.target === expEditModal) closeEditModal(); });
+
+    document.getElementById('exp-edit-save').addEventListener('click', async () => {
+      const { fields, error } = readExpenseFields(
+        document.getElementById('exp-edit-date').value,
+        document.getElementById('exp-edit-category').value,
+        document.getElementById('exp-edit-amount').value,
+        document.getElementById('exp-edit-note').value
+      );
+      if (error) {
+        showToast(error, 'warning');
+        return;
+      }
+      try {
+        await updateExpense(editingId, fields);
+        showToast('Expense updated', 'success');
+        closeEditModal();
+        await loadExpenses();
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      }
+    });
+
+    // ── Filter modal ───────────────────────────────────────────────
+    function openFilterModal() {
+      document.getElementById('exp-date-from').value = expFilters.from;
+      document.getElementById('exp-date-to').value = expFilters.to;
+      document.querySelectorAll('#exp-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      expFilterModal.classList.add('open');
+    }
+
+    function closeFilterModal() {
+      expFilterModal.classList.remove('open');
+    }
+
+    document.getElementById('exp-btn-open-filter').addEventListener('click', openFilterModal);
+    document.getElementById('exp-filter-close').addEventListener('click', closeFilterModal);
+    document.getElementById('exp-filter-cancel').addEventListener('click', closeFilterModal);
+    expFilterModal.addEventListener('click', (e) => { if (e.target === expFilterModal) closeFilterModal(); });
+
+    document.getElementById('exp-preset-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      const range = pill.dataset.preset === 'all-time' ? { from: '', to: '' } : getDateRangePreset(pill.dataset.preset);
+      document.getElementById('exp-date-from').value = range.from;
+      document.getElementById('exp-date-to').value = range.to;
+      document.querySelectorAll('#exp-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    document.getElementById('exp-filter-apply').addEventListener('click', () => {
+      const from = document.getElementById('exp-date-from').value.trim();
+      const to = document.getElementById('exp-date-to').value.trim();
+      const rangeError = validateDMYRange(from, to);
+      if (rangeError) {
+        showToast(rangeError, 'warning');
+        return;
+      }
+      expFilters.from = from;
+      expFilters.to = to;
+      closeFilterModal();
+      loadExpenses();
+    });
+
+    document.getElementById('exp-filter-reset').addEventListener('click', () => {
+      const d = defaultExpFilters();
+      document.getElementById('exp-date-from').value = d.from;
+      document.getElementById('exp-date-to').value = d.to;
+      document.querySelectorAll('#exp-preset-pills .preset-pill').forEach(p => p.classList.remove('active'));
+    });
+
+    // ── Init ───────────────────────────────────────────────────────
+    function initExpenses() {
+      if (currentRole !== 'admin') {
+        location.replace('index.html');
+        return;
+      }
+      expDate.value = todayInputValue();
+      renderAddCategoryPills();
+      renderChips();
+      loadExpenses();
+    }
+
+    wireAuthGate();
+    initAuthGate(initExpenses);
+  </script>
+</body>
+</html>
