@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expenses — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261022">
+  <link rel="stylesheet" href="style.css?v=20261028">
 </head>
 <body>
   <div class="page-wrapper">
@@ -25,7 +25,7 @@
             <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
             <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
             <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
-            <a href="expenses.html" class="nav-link active" data-page="expenses" data-role="admin-only" style="display:none">Expenses</a>
+            <a href="expenses.html" class="nav-link active" data-page="expenses">Expenses</a>
           </nav>
           <div class="user-area">
             <span class="user-email" id="user-email"></span>
@@ -183,7 +183,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261022"></script>
+  <script src="app.js?v=20261028"></script>
   <script>
     setActiveNav('expenses');
 
@@ -203,6 +203,8 @@
     const expAmount = document.getElementById('exp-amount');
     const expNote = document.getElementById('exp-note');
     const expAddBtn = document.getElementById('exp-add');
+
+    const isAdminView = () => currentRole === 'admin';
 
     const expCatPill = (cat) => `<span class="pill pill-${EXPENSE_PILL_CLASS[cat] || 'other'}">${escapeHtml(cat || '—')}</span>`;
     const sumAmounts = (rows) => rows.reduce((n, e) => n + (Number(e.amount) || 0), 0);
@@ -256,6 +258,12 @@
 
     // ── List ───────────────────────────────────────────────────────
     function renderSummary() {
+      const summaryEl = document.getElementById('exp-summary');
+      summaryEl.style.display = isAdminView() ? '' : 'none';
+      if (!isAdminView()) {
+        summaryEl.innerHTML = '';
+        return;
+      }
       const cards = [['Total', sumAmounts(expenses)]];
       let other = cards[0][1];
       EXPENSE_DISPLAY_ORDER.forEach(c => {
@@ -294,8 +302,9 @@
                 <th>Date</th>
                 <th>Category</th>
                 <th>Note</th>
+                <th>Added by</th>
                 <th class="num">Amount</th>
-                <th style="width:110px">Actions</th>
+                ${isAdminView() ? '<th style="width:110px">Actions</th>' : ''}
               </tr>
             </thead>
             <tbody>
@@ -304,23 +313,24 @@
                   <td>${escapeHtml(isoToDMY(e.expense_date))}</td>
                   <td>${expCatPill(e.category)}</td>
                   <td class="expense-note-cell">${e.note ? escapeHtml(e.note) : '—'}</td>
+                  <td>${e.created_by ? escapeHtml(e.created_by) : '—'}</td>
                   <td class="num">${formatPKR(e.amount)}</td>
-                  <td>
+                  ${isAdminView() ? `<td>
                     <div class="row-actions">
                       <button class="btn-icon-only btn-edit" title="Edit expense">✎</button>
                       <button class="btn-icon-only danger btn-delete" title="Delete expense">🗑</button>
                     </div>
-                  </td>
+                  </td>` : ''}
                 </tr>
               `).join('')}
             </tbody>
-            <tfoot>
+            ${isAdminView() ? `<tfoot>
               <tr>
-                <td colspan="3">Total (${rows.length} expense${rows.length !== 1 ? 's' : ''})</td>
+                <td colspan="4">Total (${rows.length} expense${rows.length !== 1 ? 's' : ''})</td>
                 <td class="num">${formatPKR(sumAmounts(rows))}</td>
                 <td></td>
               </tr>
-            </tfoot>
+            </tfoot>` : ''}
           </table>
         </div>
       `;
@@ -366,6 +376,7 @@
     ).join('');
 
     document.getElementById('exp-table-wrap').addEventListener('click', async (e) => {
+      if (!isAdminView()) return;
       const row = e.target.closest('tr[data-id]');
       if (!row) return;
       const exp = expenses.find(x => x.id === row.dataset.id);
@@ -471,10 +482,12 @@
 
     // ── Init ───────────────────────────────────────────────────────
     function initExpenses() {
-      if (currentRole !== 'admin') {
+      if (currentRole !== 'admin' && currentRole !== 'pharmacist') {
         location.replace('index.html');
         return;
       }
+      // Pharmacists can add and view expenses only — no editing, so the edit modal isn't there at all
+      if (!isAdminView()) expEditModal.remove();
       expDate.value = todayInputValue();
       renderAddCategoryPills();
       renderChips();
