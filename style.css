@@ -1600,6 +1600,11 @@ button.stock-num {
 
 .fin-breakdown-row strong { color: var(--text-body); font-weight: 600; }
 
+.fin-breakdown-sub {
+  padding-left: 12px;
+  font-size: 11px;
+}
+
 .fin-note { font-size: 11px; line-height: 1.4; }
 
 .stat-value.fin-positive { color: var(--success); }
@@ -1619,6 +1624,11 @@ button.stock-num {
 .cat-badge.beverage, .pill-beverage {
   background: #FEF3C7;
   color: #B45309;
+}
+
+.cat-badge.general, .pill-general {
+  background: #EDE9FE;
+  color: #6D28D9;
 }
 
 .cat-badge.ice-cream, .pill-ice-cream {

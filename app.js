@@ -24,8 +24,10 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-const EXPENSE_CATEGORIES = ['Beverage', 'Snacks', 'Ice Cream', 'Medicine'];
-const EXPENSE_DISPLAY_ORDER = ['Medicine', ...EXPENSE_CATEGORIES.filter(c => c !== 'Medicine')];
+const EXPENSE_CATEGORIES = ['Beverage', 'Snacks', 'Ice Cream', 'Medicine', 'General'];
+const GENERAL_SUBCATEGORIES = ['Repair', 'Salary', 'Utility Bill', 'Rent', 'Other'];
+// Medicine first, General last
+const EXPENSE_DISPLAY_ORDER = ['Medicine', ...EXPENSE_CATEGORIES.filter(c => c !== 'Medicine' && c !== 'General'), 'General'];
 const PROFIT_MARGIN = 0.25;
 
 // ── Supabase data helpers ──────────────────────────────────────────
@@ -159,10 +161,17 @@ async function fetchExpenses(fromISO, toISO) {
   });
 }
 
-async function addExpense({ expense_date, category, amount, note }) {
+// Types a role may pick for a General expense: Salary is admin-only.
+function generalSubcategoriesForRole() {
+  return GENERAL_SUBCATEGORIES.filter(t => t !== 'Salary' || currentRole === 'admin');
+}
+
+// subcategory only applies to General expenses; every other category must store null.
+async function addExpense({ expense_date, category, subcategory, amount, note }) {
   const { error } = await db.from('expenses').insert({
     expense_date,
     category,
+    subcategory: category === 'General' ? (subcategory || null) : null,
     amount,
     note: note || null,
     created_by: currentUser.email,
@@ -170,9 +179,15 @@ async function addExpense({ expense_date, category, amount, note }) {
   if (error) throw new Error(error.message);
 }
 
-async function updateExpense(id, { expense_date, category, amount, note }) {
+async function updateExpense(id, { expense_date, category, subcategory, amount, note }) {
   const { error } = await db.from('expenses')
-    .update({ expense_date, category, amount, note: note || null })
+    .update({
+      expense_date,
+      category,
+      subcategory: category === 'General' ? (subcategory || null) : null,
+      amount,
+      note: note || null,
+    })
     .eq('id', id);
   if (error) throw new Error(error.message);
 }

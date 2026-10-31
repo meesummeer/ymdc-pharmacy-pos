@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expenses — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261028">
+  <link rel="stylesheet" href="style.css?v=20261101">
 </head>
 <body>
   <div class="page-wrapper">
@@ -71,6 +71,10 @@
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label">Category</label>
               <div class="preset-pills" id="exp-cat-pills"></div>
+              <div id="exp-sub-wrap" style="display:none;margin-top:12px">
+                <label class="form-label">Type</label>
+                <div class="preset-pills" id="exp-sub-pills"></div>
+              </div>
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label for="exp-amount" class="form-label">Amount (PKR)</label>
@@ -78,7 +82,7 @@
             </div>
             <div class="form-group span-all" style="margin-bottom:0">
               <label for="exp-note" class="form-label">Note (optional)</label>
-              <input type="text" id="exp-note" maxlength="200" placeholder="e.g. Supplier name or bill number">
+              <input type="text" id="exp-note" maxlength="200" placeholder="e.g. AC repair, shop name">
             </div>
             <div class="span-all">
               <button type="button" class="btn btn-primary" id="exp-add">Add Expense</button>
@@ -127,6 +131,10 @@
         <div class="form-group">
           <label for="exp-edit-category" class="form-label">Category</label>
           <select id="exp-edit-category"></select>
+        </div>
+        <div class="form-group" id="exp-edit-sub-wrap" style="display:none">
+          <label class="form-label">Type</label>
+          <div class="preset-pills" id="exp-edit-sub-pills" style="margin-bottom:0"></div>
         </div>
         <div class="form-group">
           <label for="exp-edit-amount" class="form-label">Amount (PKR)</label>
@@ -183,11 +191,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261028"></script>
+  <script src="app.js?v=20261101"></script>
   <script>
     setActiveNav('expenses');
 
-    const EXPENSE_PILL_CLASS = { Medicine: 'medicine', Snacks: 'snack', Beverage: 'beverage', 'Ice Cream': 'ice-cream' };
+    const EXPENSE_PILL_CLASS = { Medicine: 'medicine', Snacks: 'snack', Beverage: 'beverage', 'Ice Cream': 'ice-cream', General: 'general' };
 
     const defaultExpFilters = () => ({ ...getDateRangePreset('this-month'), category: 'all' });
 
@@ -195,6 +203,8 @@
     let expenses = [];
     let expenseLoadSeq = 0;
     let addCategory = '';
+    let addSubcategory = '';
+    let editSubcategory = '';
     let editingId = null;
 
     const expFilterModal = document.getElementById('exp-filter-modal');
@@ -206,7 +216,14 @@
 
     const isAdminView = () => currentRole === 'admin';
 
-    const expCatPill = (cat) => `<span class="pill pill-${EXPENSE_PILL_CLASS[cat] || 'other'}">${escapeHtml(cat || '—')}</span>`;
+    const expCatPill = (cat, sub) => `<span class="pill pill-${EXPENSE_PILL_CLASS[cat] || 'other'}">${escapeHtml(cat || '—')}${cat === 'General' && sub ? ' · ' + escapeHtml(sub) : ''}</span>`;
+
+    // Type pills (General only): `selected` is the chosen type; Salary is hidden from pharmacists
+    function typePillsHtml(selected, includeSalary) {
+      return GENERAL_SUBCATEGORIES.filter(t => includeSalary || t !== 'Salary').map(t =>
+        `<button type="button" class="preset-pill${t === selected ? ' active' : ''}" data-sub="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+      ).join('');
+    }
     const sumAmounts = (rows) => rows.reduce((n, e) => n + (Number(e.amount) || 0), 0);
 
     // ── Add form ───────────────────────────────────────────────────
@@ -214,26 +231,38 @@
       document.getElementById('exp-cat-pills').innerHTML = EXPENSE_DISPLAY_ORDER.map(c =>
         `<button type="button" class="preset-pill${c === addCategory ? ' active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`
       ).join('');
+      const isGeneral = addCategory === 'General';
+      document.getElementById('exp-sub-wrap').style.display = isGeneral ? '' : 'none';
+      document.getElementById('exp-sub-pills').innerHTML = isGeneral ? typePillsHtml(addSubcategory, generalSubcategoriesForRole().includes('Salary')) : '';
     }
 
     document.getElementById('exp-cat-pills').addEventListener('click', (e) => {
       const pill = e.target.closest('.preset-pill');
       if (!pill) return;
       addCategory = pill.dataset.cat;
+      if (addCategory !== 'General') addSubcategory = '';
+      renderAddCategoryPills();
+    });
+
+    document.getElementById('exp-sub-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      addSubcategory = pill.dataset.sub;
       renderAddCategoryPills();
     });
 
     // Returns { fields } or { error } for the add / edit forms.
-    function readExpenseFields(date, category, amountRaw, note) {
+    function readExpenseFields(date, category, subcategory, amountRaw, note) {
       if (!date) return { error: 'Choose a date' };
       if (!category) return { error: 'Choose a category' };
+      if (category === 'General' && !subcategory) return { error: 'Choose a type for General expenses' };
       const amount = Math.round(Number(amountRaw) * 100) / 100;
       if (!amountRaw || !(amount > 0)) return { error: 'Enter an amount greater than 0' };
-      return { fields: { expense_date: date, category, amount, note: String(note || '').trim() } };
+      return { fields: { expense_date: date, category, subcategory: category === 'General' ? subcategory : null, amount, note: String(note || '').trim() } };
     }
 
     expAddBtn.addEventListener('click', async () => {
-      const { fields, error } = readExpenseFields(expDate.value, addCategory, expAmount.value, expNote.value);
+      const { fields, error } = readExpenseFields(expDate.value, addCategory, addSubcategory, expAmount.value, expNote.value);
       if (error) {
         showToast(error, 'warning');
         return;
@@ -271,11 +300,16 @@
         other -= v;
         cards.push([c, v]);
       });
-      if (Math.abs(other) > 0.005) cards.push(['Other', other]);
+      if (Math.abs(other) > 0.005) cards.push(['Uncategorised', other]);
+      const generalRows = expenses.filter(e => e.category === 'General');
+      const typeBreakdown = `<div class="fin-breakdown">${GENERAL_SUBCATEGORIES.map(t =>
+        `<div class="fin-breakdown-row"><span>${escapeHtml(t)}</span><strong>${formatPKR(sumAmounts(generalRows.filter(e => e.subcategory === t)))}</strong></div>`
+      ).join('')}</div>`;
       document.getElementById('exp-summary').innerHTML = cards.map(([label, v]) => `
         <div class="card stat-card">
           <span class="stat-label">${escapeHtml(label)}</span>
           <span class="stat-value">${formatPKR(v)}</span>
+          ${label === 'General' ? typeBreakdown : ''}
         </div>
       `).join('');
     }
@@ -311,7 +345,7 @@
               ${rows.map(e => `
                 <tr data-id="${escapeHtml(e.id)}">
                   <td>${escapeHtml(isoToDMY(e.expense_date))}</td>
-                  <td>${expCatPill(e.category)}</td>
+                  <td>${expCatPill(e.category, e.subcategory)}</td>
                   <td class="expense-note-cell">${e.note ? escapeHtml(e.note) : '—'}</td>
                   <td>${e.created_by ? escapeHtml(e.created_by) : '—'}</td>
                   <td class="num">${formatPKR(e.amount)}</td>
@@ -375,6 +409,25 @@
       `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
     ).join('');
 
+    // Edit modal is admin-only, so every type (including Salary) is offered
+    function renderEditSubPills() {
+      const isGeneral = document.getElementById('exp-edit-category').value === 'General';
+      document.getElementById('exp-edit-sub-wrap').style.display = isGeneral ? '' : 'none';
+      document.getElementById('exp-edit-sub-pills').innerHTML = isGeneral ? typePillsHtml(editSubcategory, true) : '';
+    }
+
+    document.getElementById('exp-edit-category').addEventListener('change', (e) => {
+      if (e.target.value !== 'General') editSubcategory = '';
+      renderEditSubPills();
+    });
+
+    document.getElementById('exp-edit-sub-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.preset-pill');
+      if (!pill) return;
+      editSubcategory = pill.dataset.sub;
+      renderEditSubPills();
+    });
+
     document.getElementById('exp-table-wrap').addEventListener('click', async (e) => {
       if (!isAdminView()) return;
       const row = e.target.closest('tr[data-id]');
@@ -391,11 +444,13 @@
           catSelect.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(exp.category)}">${escapeHtml(exp.category)}</option>`);
         }
         catSelect.value = exp.category;
+        editSubcategory = exp.category === 'General' ? (exp.subcategory || '') : '';
+        renderEditSubPills();
         document.getElementById('exp-edit-amount').value = exp.amount;
         document.getElementById('exp-edit-note').value = exp.note || '';
         expEditModal.classList.add('open');
       } else if (e.target.closest('.btn-delete')) {
-        const label = `${isoToDMY(exp.expense_date)} · ${exp.category} · ${formatPKR(exp.amount)}`;
+        const label = `${isoToDMY(exp.expense_date)} · ${exp.category}${exp.subcategory ? ' · ' + exp.subcategory : ''} · ${formatPKR(exp.amount)}`;
         if (!confirm(`Delete this expense?\n${label}`)) return;
         try {
           await deleteExpense(exp.id);
@@ -415,6 +470,7 @@
       const { fields, error } = readExpenseFields(
         document.getElementById('exp-edit-date').value,
         document.getElementById('exp-edit-category').value,
+        editSubcategory,
         document.getElementById('exp-edit-amount').value,
         document.getElementById('exp-edit-note').value
       );

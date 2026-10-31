@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hub — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261028">
+  <link rel="stylesheet" href="style.css?v=20261101">
 </head>
 <body>
   <div class="page-wrapper">
@@ -87,7 +87,7 @@
           <div class="card stat-card">
             <span class="stat-label">Net Revenue</span>
             <span class="stat-value" id="fin-net">…</span>
-            <span class="stat-sub fin-note">Expenses are stock purchases, so a negative figure means more stock bought than sold, not a loss.</span>
+            <span class="stat-sub fin-note">Expenses include stock purchases, so a negative figure can mean more stock bought than sold, not a loss.</span>
           </div>
         </div>
 
@@ -193,7 +193,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261028"></script>
+  <script src="app.js?v=20261101"></script>
   <script>
     setActiveNav('hub');
 
@@ -552,10 +552,15 @@
 
       const rows = EXPENSE_DISPLAY_ORDER.map(c => [c, sumExpenses(hubExpenses, c)]);
       const other = total - rows.reduce((n, [, v]) => n + v, 0);
-      if (Math.abs(other) > 0.005) rows.push(['Other', other]);
-      breakdownEl.innerHTML = rows.map(([c, v]) =>
-        `<div class="fin-breakdown-row"><span>${escapeHtml(c)}</span><strong>${formatPKR(v)}</strong></div>`
-      ).join('');
+      if (Math.abs(other) > 0.005) rows.push(['Uncategorised', other]);
+      const generalRows = hubExpenses.filter(e => e.category === 'General');
+      breakdownEl.innerHTML = rows.map(([c, v]) => {
+        const line = `<div class="fin-breakdown-row"><span>${escapeHtml(c)}</span><strong>${formatPKR(v)}</strong></div>`;
+        if (c !== 'General') return line;
+        return line + GENERAL_SUBCATEGORIES.map(t =>
+          `<div class="fin-breakdown-row fin-breakdown-sub"><span>${escapeHtml(t)}</span><span>${formatPKR(sumExpenses(generalRows.filter(e => e.subcategory === t)))}</span></div>`
+        ).join('');
+      }).join('');
     }
 
     async function refreshHubExpenses() {
