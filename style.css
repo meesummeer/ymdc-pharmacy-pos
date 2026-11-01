@@ -1774,3 +1774,102 @@ button.stock-num {
   .report-sheet { box-shadow: none; border: none; padding: 0; }
   .report-invoice-block { page-break-inside: avoid; }
 }
+
+/* ── Financial Report (Hub) ───────────────────────────────────── */
+.btn-report {
+  background: #1A0A6E;
+  color: #fff;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(26, 10, 110, 0.3);
+}
+.btn-report:hover:not(:disabled) { background: #12064F; box-shadow: 0 4px 10px rgba(26, 10, 110, 0.35); }
+
+.fr-picker-row { display: flex; gap: 10px; }
+.fr-picker-row select { flex: 1; }
+
+.fr-modal { max-width: 900px; }
+.fr-sheet-wrap { overflow: auto; background: #E5E7EB; padding: 16px; max-height: calc(90vh - 140px); }
+
+.fr-page {
+  --fr-navy: #1A0A6E;
+  --fr-red: #B22222;
+  width: 794px;
+  height: 1123px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: #fff;
+  color: #1F2937;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.fr-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--fr-navy);
+  color: #fff;
+  padding: 22px 40px;
+  border-bottom: 5px solid var(--fr-red);
+}
+.fr-logo { width: 56px; height: 56px; border-radius: 8px; background: #fff; object-fit: contain; flex-shrink: 0; }
+.fr-head-text { flex: 1; }
+.fr-org { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.fr-title { font-size: 14px; opacity: 0.9; margin-top: 2px; }
+.fr-generated { font-size: 11px; text-align: right; opacity: 0.9; line-height: 1.35; }
+
+.fr-section { padding: 0 40px; margin-top: 18px; }
+.fr-h {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fr-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+  padding-left: 8px;
+  border-left: 3px solid var(--fr-red);
+}
+
+.fr-table { width: 100%; border-collapse: collapse; }
+.fr-table th {
+  background: var(--fr-navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 10px;
+}
+.fr-table td { padding: 5px 10px; border-bottom: 1px solid #E5E7EB; }
+.fr-table tfoot td { font-weight: 700; color: var(--fr-navy); border-top: 2px solid var(--fr-navy); border-bottom: none; background: #F3F2FA; }
+.fr-num { text-align: right !important; white-space: nowrap; }
+.fr-none { color: #6B7280; font-style: italic; }
+
+.fr-net {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 2px solid var(--fr-navy);
+  background: #F3F2FA;
+  border-radius: 8px;
+  padding: 14px 20px;
+}
+.fr-net > div { display: flex; flex-direction: column; gap: 2px; }
+.fr-net-margin { text-align: right; align-items: flex-end; }
+.fr-net-label { font-size: 11px; color: #4B5563; text-transform: uppercase; letter-spacing: 0.04em; }
+.fr-net-value { font-size: 26px; font-weight: 800; color: var(--fr-navy); }
+.fr-net-small { font-size: 20px; }
+.fr-pos { color: #166534; }
+.fr-neg { color: var(--fr-red); }
+
+.fr-bullets { margin: 0; padding-left: 20px; }
+.fr-bullets li { margin-bottom: 6px; }
+
+.fr-foot { margin: 16px 40px 0; font-size: 10px; color: #6B7280; border-top: 1px solid #E5E7EB; padding-top: 8px; }
+.fr-empty { text-align: center; color: #6B7280; font-size: 18px; padding: 140px 40px; }
+
+.fr-page.fr-compact { font-size: 12px; }
+.fr-page.fr-compact .fr-section { margin-top: 12px; }
+.fr-page.fr-compact .fr-table td { padding: 3px 10px; }

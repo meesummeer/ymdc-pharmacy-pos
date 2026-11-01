@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hub — YMDC Pharmacy</title>
-  <link rel="stylesheet" href="style.css?v=20261101">
+  <link rel="stylesheet" href="style.css?v=20261102">
 </head>
 <body>
   <div class="page-wrapper">
@@ -59,7 +59,13 @@
       </div>
 
       <div id="page-content" style="display:none">
-        <h2 class="page-title">Admin Hub</h2>
+        <div class="page-header-row">
+          <h2 class="page-title">Admin Hub</h2>
+          <button type="button" class="btn btn-sm btn-report" id="fr-open" data-role="admin-only" style="display:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>
+            Generate Financial Report
+          </button>
+        </div>
 
         <div class="filter-bar card">
           <div id="hub-range-summary" class="filter-summary" style="margin:0;flex:1;border:none;padding:0;background:transparent">
@@ -191,9 +197,44 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="fr-picker-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Financial Report</h3>
+        <button class="modal-close" id="fr-picker-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="filter-section-title">Month</div>
+        <div class="fr-picker-row">
+          <select id="fr-month" aria-label="Month"></select>
+          <select id="fr-year" aria-label="Year"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-text" id="fr-picker-cancel">Cancel</button>
+        <button type="button" class="btn btn-sm btn-report" id="fr-generate">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="fr-preview-modal">
+    <div class="modal fr-modal">
+      <div class="modal-header">
+        <h3>Profit &amp; Loss Report</h3>
+        <button class="modal-close" id="fr-preview-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="fr-sheet-wrap"><div class="fr-page" id="fr-page"></div></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-text" id="fr-change-month">Change month</button>
+        <button type="button" class="btn btn-sm btn-report" id="fr-download">Download PDF</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js?v=20261101"></script>
+  <script src="financial-report.js?v=20261102"></script>
   <script>
     setActiveNav('hub');
 
@@ -669,6 +710,7 @@
       refreshHubExpenses();
     });
 
+    wireFinancialReport();
     wireAuthGate();
     initAuthGate(loadHub);
   </script>
