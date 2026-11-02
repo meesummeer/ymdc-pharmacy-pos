@@ -30,6 +30,11 @@ const GENERAL_SUBCATEGORIES = ['Repair', 'Salary', 'Utility Bill', 'Rent', 'Othe
 const EXPENSE_DISPLAY_ORDER = ['Medicine', ...EXPENSE_CATEGORIES.filter(c => c !== 'Medicine' && c !== 'General'), 'General'];
 const PROFIT_MARGIN = 0.25;
 
+// Cloud backup (Hub): Cloudflare Worker that stores backup zips in R2. Public URL, no secrets.
+const BACKUP_WORKER_URL = 'https://pharmacypilot-backup.ymdc-clinic.workers.dev';
+// Add new tables here when SQL adds them
+const BACKUP_TABLES = ['inventory', 'invoices', 'sale_items', 'request_stock', 'expenses'];
+
 // ── Supabase data helpers ──────────────────────────────────────────
 const SUPABASE_PAGE_SIZE = 1000;
 

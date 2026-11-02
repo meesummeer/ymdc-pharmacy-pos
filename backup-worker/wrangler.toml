@@ -1,0 +1,13 @@
+name = "pharmacypilot-backup"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "pharmacypilot-backups"
+
+# Public values (the anon key already ships in config.js). There are no secrets.
+[vars]
+SUPABASE_URL = "https://uuyuzkfxwqlyjjlgwdwl.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1eXV6a2Z4d3FseWpqbGd3ZHdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwNzk2ODAsImV4cCI6MjEwNTY1NTY4MH0.KPaEZgORogMyujSPLG5bwgXS4OTomOOrYwlvUGO1QqU"
+ALLOWED_ORIGINS = "https://pharmacypilot.ymdc.net,https://meesummeer.github.io"

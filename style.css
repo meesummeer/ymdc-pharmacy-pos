@@ -1873,3 +1873,20 @@ button.stock-num {
 .fr-page.fr-compact { font-size: 12px; }
 .fr-page.fr-compact .fr-section { margin-top: 12px; }
 .fr-page.fr-compact .fr-table td { padding: 3px 10px; }
+
+/* ── Cloud backup (Hub) ───────────────────────────────────────── */
+.backup-last { color: var(--text-secondary); margin-bottom: 12px; }
+.backup-warn {
+  display: inline-block;
+  background: #FEF3C7;
+  color: #B45309;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.backup-progress { margin-top: 12px; color: var(--text); font-weight: 500; }
+.backup-result { margin-top: 12px; }
+.backup-result.ok { color: #166534; font-weight: 600; }
+.backup-result.err { color: var(--error); font-weight: 600; }
+#backup-download { margin-top: 12px; }
