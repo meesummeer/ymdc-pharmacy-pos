@@ -1890,3 +1890,46 @@ button.stock-num {
 .backup-result.ok { color: #166534; font-weight: 600; }
 .backup-result.err { color: var(--error); font-weight: 600; }
 #backup-download { margin-top: 12px; }
+
+/* ── Staff Credit (admin) ─────────────────────────────────────── */
+.pill-unpaid { background: #FEF3C7; color: #B45309; }
+.pill-paid { background: #D1FAE5; color: #047857; }
+
+.sc-staff-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sc-staff-bar .preset-pills { margin-bottom: 0; }
+.sc-staff-pill.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.sc-empty-staff { color: var(--text-secondary); font-size: 14px; }
+
+.sc-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sc-panel-head h3 { font-size: 18px; color: var(--navy); }
+.sc-panel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.sc-period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.sc-period-label { min-width: 150px; text-align: center; font-weight: 600; color: var(--text); }
+.sc-period .btn-icon-only { font-size: 16px; }
+.sc-period .btn-icon-only:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sc-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.sc-summary > div { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+.sc-summary span { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+.sc-summary strong { font-size: 18px; color: var(--navy); }
+.sc-summary .owed strong { color: #B45309; }
+
+.sc-bulk { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.sc-table td.sc-note { max-width: 240px; white-space: normal; word-break: break-word; }
+.sc-table input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--navy); cursor: pointer; }
+
+.sc-picked { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); font-size: 14px; }
+.sc-picked small { display: block; color: var(--text-secondary); margin-top: 2px; }
+.search-dropdown-item.sc-disabled { opacity: 0.5; cursor: not-allowed; }
+.sc-item-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.sc-modal-error { color: var(--error); font-size: 13px; margin-top: 8px; min-height: 0; }
+
+/* Hub: To Collect card (amber) */
+.stat-card.stat-card-amber { background: #FFFBEB; border-color: #FDE68A; }
+.stat-card.stat-card-amber::before { background: linear-gradient(90deg, #F59E0B, #B45309); }
+.stat-card.stat-card-amber .stat-value { color: #B45309; }
+
+@media (max-width: 768px) {
+  .sc-summary { grid-template-columns: 1fr; }
+}

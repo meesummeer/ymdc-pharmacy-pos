@@ -66,8 +66,8 @@ async function bkSha256Hex(blob) {
 
 const BK_RESTORE_README = `PharmacyPilot backup - restore notes
 
-- sale_items.line_total is a generated column. Skip it when importing.
-- Restore in this order: inventory, invoices, sale_items, request_stock, expenses.
+- sale_items.line_total and staff_credit.total are generated columns. Skip them when importing.
+- Restore in this order: inventory, invoices, sale_items, request_stock, expenses, staff, staff_credit.
 - Each table is included as <table>.json (exact data) and <table>.csv (for spreadsheets; text cells that start with = + - or @ are prefixed with a single quote).
 - manifest.json lists when the backup was made, who ran it, and the row count of every table.
 `;

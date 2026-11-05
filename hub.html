@@ -7,7 +7,7 @@
   <link rel="icon" href="favicon.ico?v=20261104" sizes="any">
   <link rel="icon" type="image/png" href="favicon.png?v=20261104">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261104">
-  <link rel="stylesheet" href="style.css?v=20261102b">
+  <link rel="stylesheet" href="style.css?v=20261105">
 </head>
 <body>
   <div class="page-wrapper">
@@ -29,6 +29,7 @@
             <a href="hub.html" class="nav-link active" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
             <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
             <a href="expenses.html" class="nav-link" data-page="expenses">Expenses</a>
+            <a href="staff-credit.html" class="nav-link" data-page="staff-credit" data-role="admin-only" style="display:none">Staff Credit</a>
           </nav>
           <div class="user-area">
             <span class="user-email" id="user-email"></span>
@@ -97,6 +98,16 @@
             <span class="stat-label">Net Revenue</span>
             <span class="stat-value" id="fin-net">…</span>
             <span class="stat-sub fin-note">Expenses include stock purchases, so a negative figure can mean more stock bought than sold, not a loss.</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Staff Credit</span>
+            <span class="stat-value" id="fin-staff-credit">…</span>
+            <span class="stat-sub" id="fin-staff-credit-sub"></span>
+          </div>
+          <div class="card stat-card stat-card-amber">
+            <span class="stat-label">To Collect</span>
+            <span class="stat-value" id="fin-to-collect">…</span>
+            <span class="stat-sub" id="fin-to-collect-sub"></span>
           </div>
         </div>
 
@@ -246,7 +257,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=20261102"></script>
+  <script src="app.js?v=20261105"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="financial-report.js?v=20261102"></script>
   <script src="cloud-backup.js?v=20261102"></script>
@@ -636,6 +647,62 @@
       renderFinanceCards();
     }
 
+    // ── Staff credit cards (never allowed to break the rest of the Hub) ──
+    let hubStaffCredit = null; // { total, paid, unpaid, collectTotal, owingStaff } | null while loading / on error
+    let hubStaffCreditError = false;
+    let staffCreditRequestSeq = 0;
+
+    function renderStaffCreditCards() {
+      const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+      if (!hubStaffCredit) {
+        const placeholder = hubStaffCreditError ? '—' : '…';
+        set('fin-staff-credit', placeholder);
+        set('fin-staff-credit-sub', '');
+        set('fin-to-collect', placeholder);
+        set('fin-to-collect-sub', '');
+        return;
+      }
+      const s = hubStaffCredit;
+      set('fin-staff-credit', formatPKR(s.total));
+      set('fin-staff-credit-sub', `${formatPKR(s.paid)} collected · ${formatPKR(s.unpaid)} pending`);
+      set('fin-to-collect', formatPKR(s.collectTotal));
+      set('fin-to-collect-sub', `${s.owingStaff} staff owe`);
+    }
+
+    async function refreshHubStaffCredit() {
+      const seq = ++staffCreditRequestSeq;
+      hubStaffCredit = null;
+      hubStaffCreditError = false;
+      renderStaffCreditCards();
+      try {
+        const from = dmyToISO(hubDateFrom);
+        const to = dmyToISO(hubDateTo);
+        const [inRange, unpaidAll] = await Promise.all([
+          fetchAllPages(() => {
+            let q = db.from('staff_credit').select('id, total, status');
+            if (from) q = q.gte('taken_on', from);
+            if (to) q = q.lte('taken_on', to);
+            return q.order('id');
+          }),
+          fetchAllPages(() => db.from('staff_credit').select('id, staff_id, total').eq('status', 'unpaid').order('id')),
+        ]);
+        if (seq !== staffCreditRequestSeq) return;
+        const sum = (rows) => rows.reduce((n, r) => n + (Number(r.total) || 0), 0);
+        hubStaffCredit = {
+          total: sum(inRange),
+          paid: sum(inRange.filter(r => r.status === 'paid')),
+          unpaid: sum(inRange.filter(r => r.status !== 'paid')),
+          collectTotal: sum(unpaidAll),
+          owingStaff: new Set(unpaidAll.map(r => String(r.staff_id))).size,
+        };
+      } catch (err) {
+        if (seq !== staffCreditRequestSeq) return;
+        hubStaffCreditError = true;
+        console.error('Staff credit cards failed to load:', err);
+      }
+      renderStaffCreditCards();
+    }
+
     function renderHub() {
       const invoices = getFilteredHubInvoices();
       const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
@@ -678,6 +745,7 @@
         hubDateTo = range.to;
         renderHub();
         refreshHubExpenses();
+        refreshHubStaffCredit();
         loadCloudBackupCard();
       } catch (err) {
         showToast('Failed to load Hub data: ' + err.message, 'error');
@@ -724,6 +792,7 @@
       closeHubFilterModal();
       renderHub();
       refreshHubExpenses();
+      refreshHubStaffCredit();
     });
 
     wireFinancialReport();

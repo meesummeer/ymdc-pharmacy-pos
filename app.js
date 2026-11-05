@@ -33,7 +33,7 @@ const PROFIT_MARGIN = 0.25;
 // Cloud backup (Hub): Cloudflare Worker that stores backup zips in R2. Public URL, no secrets.
 const BACKUP_WORKER_URL = 'https://pharmacypilot-backup.ymdc-clinic.workers.dev';
 // Add new tables here when SQL adds them
-const BACKUP_TABLES = ['inventory', 'invoices', 'sale_items', 'request_stock', 'expenses'];
+const BACKUP_TABLES = ['inventory', 'invoices', 'sale_items', 'request_stock', 'expenses', 'staff', 'staff_credit'];
 
 // ── Supabase data helpers ──────────────────────────────────────────
 const SUPABASE_PAGE_SIZE = 1000;

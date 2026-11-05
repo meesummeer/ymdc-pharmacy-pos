@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Credit — YMDC Pharmacy</title>
+  <link rel="icon" href="favicon.ico?v=20261104" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png?v=20261104">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261104">
+  <link rel="stylesheet" href="style.css?v=20261105">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="site-header" id="site-header" style="display:none">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="40" height="40">
+          <div class="brand-text">
+            <h1>Yaseen Medical &amp; General Store</h1>
+            <span class="short">YMDC</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <nav class="main-nav">
+            <a href="index.html" class="nav-link" data-page="pos">POS</a>
+            <a href="inventory.html" class="nav-link" data-page="inventory">Inventory</a>
+            <a href="history.html" class="nav-link" data-page="history">History</a>
+            <a href="request-stock.html" class="nav-link" data-page="request-stock">Request Stock</a>
+            <a href="hub.html" class="nav-link" data-page="hub" data-role="admin-only" style="display:none">Hub</a>
+            <a href="analytics.html" class="nav-link" data-page="analytics" data-role="admin-only" style="display:none">Analytics</a>
+            <a href="expenses.html" class="nav-link" data-page="expenses">Expenses</a>
+            <a href="staff-credit.html" class="nav-link active" data-page="staff-credit" data-role="admin-only" style="display:none">Staff Credit</a>
+          </nav>
+          <div class="user-area">
+            <span class="user-email" id="user-email"></span>
+            <a href="#" class="logout-link" id="logout-link">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="auth-view" id="auth-view" style="display:none">
+        <div class="card auth-card">
+          <div class="auth-brand">
+            <img src="logo.jpeg" alt="YMDC Logo" class="brand-logo" width="48" height="48">
+            <h2>Yaseen Medical &amp; Diagnostic Centre</h2>
+            <p class="auth-subtitle">Sign in to continue</p>
+          </div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" id="login-email" class="input-lg" style="padding-left:16px" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label for="login-password" class="form-label">Password</label>
+              <input type="password" id="login-password" class="input-lg" style="padding-left:16px" required autocomplete="current-password">
+            </div>
+            <span class="field-error" id="login-error"></span>
+            <button type="submit" class="btn btn-primary" id="login-submit" style="width:100%;margin-top:20px">Sign In</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="page-content" style="display:none">
+        <h2 class="page-title">Staff Credit</h2>
+
+        <div class="card">
+          <div class="sc-staff-bar">
+            <div class="preset-pills" id="sc-staff-pills"></div>
+            <button type="button" class="btn btn-secondary btn-sm sc-lock" id="sc-add-staff">+ Add staff</button>
+          </div>
+          <div class="sc-empty-staff" id="sc-staff-empty" style="display:none">No staff yet. Add the first one.</div>
+        </div>
+
+        <div class="card" id="sc-panel" style="display:none">
+          <div class="sc-panel-head">
+            <h3 id="sc-staff-name"></h3>
+            <div class="sc-panel-actions">
+              <button type="button" class="btn btn-gold btn-sm sc-lock" id="sc-add-item">+ Add item</button>
+              <button type="button" class="btn btn-secondary btn-sm sc-lock" id="sc-edit-staff">Edit staff</button>
+              <button type="button" class="btn btn-danger btn-sm sc-lock" id="sc-delete-staff">Delete staff</button>
+            </div>
+          </div>
+
+          <div class="sc-period" id="sc-period"></div>
+          <div class="sc-summary" id="sc-summary"></div>
+          <div class="sc-bulk" id="sc-bulk"></div>
+          <div id="sc-table-wrap"><div class="loading">Loading entries</div></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      Yaseen Medical &amp; Diagnostic Centre · Powered by CyberHealth Solutions · 2026
+    </footer>
+  </div>
+
+  <!-- Add / rename staff -->
+  <div class="modal-overlay" id="sc-staff-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="sc-staff-modal-title">Add staff</h3>
+        <button class="modal-close" id="sc-staff-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom:0">
+          <label for="sc-staff-input" class="form-label">Name</label>
+          <input type="text" id="sc-staff-input" maxlength="60" autocomplete="off">
+          <div class="sc-modal-error" id="sc-staff-error"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="sc-staff-cancel">Cancel</button>
+        <button class="btn btn-primary" id="sc-staff-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / edit entry -->
+  <div class="modal-overlay" id="sc-item-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="sc-item-modal-title">Add item</h3>
+        <button class="modal-close" id="sc-item-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" id="sc-pick-group">
+          <label for="sc-item-search" class="form-label">Item</label>
+          <div class="search-wrapper">
+            <input type="text" id="sc-item-search" class="input-search" placeholder="Search inventory by name…" autocomplete="off">
+            <div class="search-dropdown" id="sc-item-dropdown"></div>
+          </div>
+        </div>
+        <div class="sc-picked" id="sc-picked" style="display:none"></div>
+        <div class="form-group" style="margin-top:16px">
+          <label for="sc-qty" class="form-label">Quantity</label>
+          <input type="number" id="sc-qty" min="1" step="1" value="1">
+        </div>
+        <div class="form-group">
+          <label for="sc-price" class="form-label">Unit price (PKR)</label>
+          <input type="number" id="sc-price" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="sc-date" class="form-label">Date</label>
+          <input type="date" id="sc-date">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="sc-note" class="form-label">Note (optional)</label>
+          <input type="text" id="sc-note" maxlength="200">
+        </div>
+        <div class="sc-modal-error" id="sc-item-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="sc-item-cancel">Cancel</button>
+        <button class="btn btn-primary" id="sc-item-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js?v=20261105"></script>
+  <script>
+    setActiveNav('staff-credit');
+
+    // ── State ─────────────────────────────────────────────────────
+    let staffList = [];            // every staff row (active + inactive), for duplicate checks
+    let selectedStaffId = null;    // String(id)
+    let entries = [];              // staff_credit rows for the selected staff + period
+    let period = null;             // { y, m } or null = all time
+    let selected = new Set();      // String(entry id)
+    let scBusy = false;
+    let loadSeq = 0;
+    let staffModalMode = 'add';    // 'add' | 'rename'
+    let itemModalMode = 'add';     // 'add' | 'edit'
+    let editingEntry = null;
+    let inventoryItems = [];
+    let pickedItem = null;
+    let maxQty = null;
+
+    const $ = (id) => document.getElementById(id);
+    const staffModal = $('sc-staff-modal');
+    const itemModal = $('sc-item-modal');
+    const sumTotals = (rows) => rows.reduce((n, r) => n + (Number(r.total) || 0), 0);
+    const activeStaff = () => staffList.filter(s => s.active !== false);
+    const selectedStaff = () => staffList.find(s => String(s.id) === selectedStaffId) || null;
+
+    // Today in Asia/Karachi as YYYY-MM-DD
+    function karachiToday() {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    }
+    function currentKarachiPeriod() {
+      const [y, m] = karachiToday().split('-').map(Number);
+      return { y, m };
+    }
+    function periodRange() {
+      if (!period) return { from: '', to: '' };
+      const mm = String(period.m).padStart(2, '0');
+      const last = new Date(Date.UTC(period.y, period.m, 0)).getUTCDate();
+      return { from: `${period.y}-${mm}-01`, to: `${period.y}-${mm}-${String(last).padStart(2, '0')}` };
+    }
+    const periodLabel = () => period ? `${MONTH_NAMES[period.m - 1]} ${period.y}` : 'All time';
+
+    function titleCase(name) {
+      return name.trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase());
+    }
+
+    // ── Data calls ────────────────────────────────────────────────
+    async function fetchStaffList() {
+      return fetchAllPages(() => db.from('staff').select('*').order('name').order('id'));
+    }
+
+    async function fetchEntries(staffId) {
+      const { from, to } = periodRange();
+      return fetchAllPages(() => {
+        let q = db.from('staff_credit').select('*').eq('staff_id', staffId);
+        if (from) q = q.gte('taken_on', from);
+        if (to) q = q.lte('taken_on', to);
+        return q.order('taken_on', { ascending: false }).order('id', { ascending: true });
+      });
+    }
+
+    async function rpc(name, args) {
+      const { data, error } = await db.rpc(name, args);
+      if (error) throw new Error(error.message);
+      return data;
+    }
+
+    // ── Busy handling (no double submits) ─────────────────────────
+    function setBusy(b) {
+      scBusy = b;
+      document.querySelectorAll('.sc-lock').forEach(el => { el.disabled = b; });
+      $('sc-item-save').disabled = b;
+      $('sc-staff-save').disabled = b;
+      renderStaffPills();
+      renderPanel();
+    }
+
+    async function runBusy(fn) {
+      if (scBusy) return;
+      setBusy(true);
+      try { await fn(); } finally { setBusy(false); }
+    }
+
+    // ── Staff pills ───────────────────────────────────────────────
+    function renderStaffPills() {
+      const list = activeStaff();
+      $('sc-staff-pills').innerHTML = list.map(s =>
+        `<button type="button" class="preset-pill sc-staff-pill${String(s.id) === selectedStaffId ? ' active' : ''}" data-id="${escapeHtml(s.id)}"${scBusy ? ' disabled' : ''}>${escapeHtml(s.name)}</button>`
+      ).join('');
+      $('sc-staff-empty').style.display = list.length ? 'none' : '';
+    }
+
+    $('sc-staff-pills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.sc-staff-pill');
+      if (!pill || scBusy) return;
+      if (selectedStaffId === pill.dataset.id) return;
+      selectedStaffId = pill.dataset.id;
+      period = currentKarachiPeriod();
+      selected.clear();
+      entries = [];
+      renderStaffPills();
+      loadEntries();
+    });
+
+    // ── Entries panel ─────────────────────────────────────────────
+    async function loadEntries() {
+      const staff = selectedStaff();
+      if (!staff) { renderPanel(); return; }
+      const seq = ++loadSeq;
+      $('sc-table-wrap').innerHTML = '<div class="loading">Loading entries</div>';
+      $('sc-panel').style.display = '';
+      $('sc-staff-name').textContent = staff.name;
+      try {
+        const rows = await fetchEntries(staff.id);
+        if (seq !== loadSeq) return;
+        entries = rows;
+        selected.clear();
+        renderPanel();
+      } catch (err) {
+        if (seq !== loadSeq) return;
+        $('sc-table-wrap').innerHTML = `<div class="empty-state"><p>Failed to load: ${escapeHtml(err.message)}</p></div>`;
+        showToast('Failed to load entries: ' + err.message, 'error');
+      }
+    }
+
+    function renderPeriod() {
+      const cur = currentKarachiPeriod();
+      $('sc-period').innerHTML = `
+        <button type="button" class="btn-icon-only" id="sc-prev" title="Previous month" aria-label="Previous month"${scBusy || !period ? ' disabled' : ''}>&lsaquo;</button>
+        <span class="sc-period-label">${escapeHtml(periodLabel())}</span>
+        <button type="button" class="btn-icon-only" id="sc-next" title="Next month" aria-label="Next month"${scBusy || !period ? ' disabled' : ''}>&rsaquo;</button>
+        <button type="button" class="preset-pill${period ? '' : ' active'}" id="sc-all"${scBusy ? ' disabled' : ''}>All time</button>
+        ${period && (period.y !== cur.y || period.m !== cur.m) ? `<button type="button" class="preset-pill" id="sc-thismonth"${scBusy ? ' disabled' : ''}>This month</button>` : ''}
+      `;
+    }
+
+    function renderPanel() {
+      const staff = selectedStaff();
+      $('sc-panel').style.display = staff ? '' : 'none';
+      if (!staff) return;
+      $('sc-staff-name').textContent = staff.name;
+      renderPeriod();
+
+      const total = sumTotals(entries);
+      const paid = sumTotals(entries.filter(r => r.status === 'paid'));
+      const owed = sumTotals(entries.filter(r => r.status !== 'paid'));
+      $('sc-summary').innerHTML = `
+        <div><span>Total taken</span><strong>${formatPKR(total)}</strong></div>
+        <div><span>Paid</span><strong>${formatPKR(paid)}</strong></div>
+        <div class="owed"><span>Still owed</span><strong>${formatPKR(owed)}</strong></div>
+      `;
+
+      const unpaidSel = entries.filter(r => selected.has(String(r.id)) && r.status !== 'paid');
+      const paidSel = entries.filter(r => selected.has(String(r.id)) && r.status === 'paid');
+      const unpaidAll = entries.filter(r => r.status !== 'paid');
+      const dis = (cond) => (scBusy || cond) ? ' disabled' : '';
+      $('sc-bulk').innerHTML = `
+        <button type="button" class="btn btn-primary btn-sm" id="sc-mark-sel"${dis(!unpaidSel.length)}>Mark selected paid${unpaidSel.length ? ` (${unpaidSel.length})` : ''}</button>
+        <button type="button" class="btn btn-gold btn-sm" id="sc-mark-all"${dis(!unpaidAll.length)}>${period ? 'Mark whole month paid' : 'Mark all paid'}</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="sc-mark-unpaid"${dis(!paidSel.length)}>Mark unpaid${paidSel.length ? ` (${paidSel.length})` : ''}</button>
+      `;
+
+      if (!entries.length) {
+        $('sc-table-wrap').innerHTML = `<div class="empty-state"><div class="empty-state-icon">🧾</div><p>No entries for ${escapeHtml(periodLabel())}.</p></div>`;
+        return;
+      }
+      const allChecked = entries.length && entries.every(r => selected.has(String(r.id)));
+      $('sc-table-wrap').innerHTML = `
+        <div class="table-wrapper">
+          <table class="data-table sc-table">
+            <thead>
+              <tr>
+                <th style="width:36px"><input type="checkbox" id="sc-check-all" aria-label="Select all"${allChecked ? ' checked' : ''}${scBusy ? ' disabled' : ''}></th>
+                <th>Date</th>
+                <th>Item</th>
+                <th class="num">Qty</th>
+                <th class="num">Unit price</th>
+                <th class="num">Total</th>
+                <th>Note</th>
+                <th>Status</th>
+                <th style="width:110px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(r => {
+                const isPaid = r.status === 'paid';
+                const title = isPaid && r.paid_on ? ` title="Paid on ${escapeHtml(isoToDMY(r.paid_on))}"` : '';
+                return `
+                <tr data-id="${escapeHtml(r.id)}">
+                  <td><input type="checkbox" class="sc-row-check" aria-label="Select entry"${selected.has(String(r.id)) ? ' checked' : ''}${scBusy ? ' disabled' : ''}></td>
+                  <td>${escapeHtml(isoToDMY(r.taken_on))}</td>
+                  <td>${escapeHtml(r.item_name)}</td>
+                  <td class="num">${escapeHtml(r.quantity)}</td>
+                  <td class="num">${formatPKR(r.unit_price)}</td>
+                  <td class="num">${formatPKR(r.total)}</td>
+                  <td class="sc-note">${r.note ? escapeHtml(r.note) : '—'}</td>
+                  <td><span class="pill ${isPaid ? 'pill-paid' : 'pill-unpaid'}"${title}>${isPaid ? 'Paid' : 'Unpaid'}</span></td>
+                  <td>
+                    <div class="row-actions">
+                      <button type="button" class="btn-icon-only btn-edit" title="Edit entry"${scBusy ? ' disabled' : ''}>✎</button>
+                      <button type="button" class="btn-icon-only danger btn-delete" title="Delete entry"${scBusy ? ' disabled' : ''}>🗑</button>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5">Total (${entries.length} entr${entries.length !== 1 ? 'ies' : 'y'})</td>
+                <td class="num">${formatPKR(total)}</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    // Period controls
+    $('sc-period').addEventListener('click', (e) => {
+      if (scBusy) return;
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.id === 'sc-prev' || btn.id === 'sc-next') {
+        const d = btn.id === 'sc-prev' ? -1 : 1;
+        let y = period.y;
+        let m = period.m + d;
+        if (m < 1) { m = 12; y--; }
+        if (m > 12) { m = 1; y++; }
+        period = { y, m };
+      } else if (btn.id === 'sc-all') {
+        period = period ? null : currentKarachiPeriod();
+      } else if (btn.id === 'sc-thismonth') {
+        period = currentKarachiPeriod();
+      } else return;
+      loadEntries();
+    });
+
+    // Selection
+    $('sc-table-wrap').addEventListener('change', (e) => {
+      if (scBusy) return;
+      if (e.target.id === 'sc-check-all') {
+        selected = e.target.checked ? new Set(entries.map(r => String(r.id))) : new Set();
+        renderPanel();
+      } else if (e.target.classList.contains('sc-row-check')) {
+        const id = e.target.closest('tr').dataset.id;
+        if (e.target.checked) selected.add(id); else selected.delete(id);
+        renderPanel();
+      }
+    });
+
+    // Mark paid / unpaid
+    async function markPaid(rows, paid) {
+      if (!rows.length) return;
+      await runBusy(async () => {
+        try {
+          await rpc('mark_staff_credit_paid', {
+            p_ids: rows.map(r => r.id),
+            p_paid: paid,
+            p_paid_on: paid ? karachiToday() : null,
+          });
+          showToast(paid ? `Marked ${rows.length} paid` : `Marked ${rows.length} unpaid`, 'success');
+          await loadEntries();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    }
+
+    $('sc-bulk').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn || scBusy) return;
+      if (btn.id === 'sc-mark-sel') {
+        markPaid(entries.filter(r => selected.has(String(r.id)) && r.status !== 'paid'), true);
+      } else if (btn.id === 'sc-mark-unpaid') {
+        markPaid(entries.filter(r => selected.has(String(r.id)) && r.status === 'paid'), false);
+      } else if (btn.id === 'sc-mark-all') {
+        const rows = entries.filter(r => r.status !== 'paid');
+        if (!rows.length) return;
+        const what = period ? periodLabel() : 'all time';
+        if (!confirm(`Mark ${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'} (${formatPKR(sumTotals(rows))}) as paid for ${selectedStaff().name} — ${what}?`)) return;
+        markPaid(rows, true);
+      }
+    });
+
+    // Edit / delete entry
+    $('sc-table-wrap').addEventListener('click', async (e) => {
+      if (scBusy) return;
+      const row = e.target.closest('tr[data-id]');
+      if (!row) return;
+      const entry = entries.find(r => String(r.id) === row.dataset.id);
+      if (!entry) return;
+      if (e.target.closest('.btn-edit')) {
+        openItemModal('edit', entry);
+      } else if (e.target.closest('.btn-delete')) {
+        if (!confirm('Delete this entry? The quantity goes back into inventory.')) return;
+        await runBusy(async () => {
+          try {
+            await rpc('delete_staff_credit', { p_id: entry.id });
+            showToast('Entry deleted', 'success');
+            await loadEntries();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      }
+    });
+
+    // ── Staff modal (add / rename) ────────────────────────────────
+    function openStaffModal(mode) {
+      staffModalMode = mode;
+      $('sc-staff-modal-title').textContent = mode === 'add' ? 'Add staff' : 'Edit staff';
+      $('sc-staff-input').value = mode === 'rename' ? (selectedStaff() || {}).name || '' : '';
+      $('sc-staff-error').textContent = '';
+      staffModal.classList.add('open');
+      $('sc-staff-input').focus();
+    }
+    function closeStaffModal() { staffModal.classList.remove('open'); }
+
+    $('sc-add-staff').addEventListener('click', () => { if (!scBusy) openStaffModal('add'); });
+    $('sc-edit-staff').addEventListener('click', () => { if (!scBusy && selectedStaff()) openStaffModal('rename'); });
+    $('sc-staff-close').addEventListener('click', closeStaffModal);
+    $('sc-staff-cancel').addEventListener('click', closeStaffModal);
+    staffModal.addEventListener('click', (e) => { if (e.target === staffModal) closeStaffModal(); });
+    $('sc-staff-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sc-staff-save').click(); });
+
+    $('sc-staff-save').addEventListener('click', async () => {
+      if (scBusy) return;
+      const name = titleCase($('sc-staff-input').value);
+      const err = $('sc-staff-error');
+      if (!name) { err.textContent = 'Enter a name'; return; }
+      const renamingId = staffModalMode === 'rename' && selectedStaff() ? String(selectedStaff().id) : null;
+      const dup = staffList.find(s => s.name.trim().toLowerCase() === name.toLowerCase() && String(s.id) !== renamingId);
+      if (dup) { err.textContent = `"${dup.name}" already exists${dup.active === false ? ' (deactivated)' : ''}. Use a different name.`; return; }
+      await runBusy(async () => {
+        try {
+          if (renamingId) {
+            const { error } = await db.from('staff').update({ name }).eq('id', renamingId);
+            if (error) throw new Error(error.message);
+          } else {
+            const { data, error } = await db.from('staff').insert({ name }).select().single();
+            if (error) throw new Error(error.message);
+            selectedStaffId = String(data.id);
+            period = currentKarachiPeriod();
+            entries = [];
+          }
+          staffList = await fetchStaffList();
+          closeStaffModal();
+          showToast(renamingId ? 'Staff renamed' : 'Staff added', 'success');
+          if (!renamingId) await loadEntries();
+        } catch (e) {
+          err.textContent = e.message;
+        }
+      });
+    });
+
+    // Delete staff: only when they have zero entries, otherwise offer Deactivate
+    $('sc-delete-staff').addEventListener('click', async () => {
+      const staff = selectedStaff();
+      if (!staff || scBusy) return;
+      await runBusy(async () => {
+        try {
+          const { count, error } = await db.from('staff_credit').select('id', { count: 'exact', head: true }).eq('staff_id', staff.id);
+          if (error) throw new Error(error.message);
+          if (count > 0) {
+            if (!confirm(`Remove or settle their entries first.\n\n${staff.name} has ${count} entr${count !== 1 ? 'ies' : 'y'}, so they can't be deleted.\n\nDeactivate ${staff.name} instead? Their button is hidden but the history stays.`)) return;
+            const { error: dErr } = await db.from('staff').update({ active: false }).eq('id', staff.id);
+            if (dErr) throw new Error(dErr.message);
+            showToast(`${staff.name} deactivated`, 'success');
+          } else {
+            if (!confirm(`Delete ${staff.name}? This cannot be undone.`)) return;
+            const { error: dErr } = await db.from('staff').delete().eq('id', staff.id);
+            if (dErr) throw new Error(dErr.message);
+            showToast(`${staff.name} deleted`, 'success');
+          }
+          staffList = await fetchStaffList();
+          selectedStaffId = null;
+          entries = [];
+          selected.clear();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    });
+
+    // ── Item modal (add / edit) ───────────────────────────────────
+    const searchInput = $('sc-item-search');
+    const dropdown = $('sc-item-dropdown');
+
+    function renderPicked() {
+      const box = $('sc-picked');
+      if (!pickedItem) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.style.display = '';
+      box.innerHTML = `<strong>${escapeHtml(pickedItem.name)}</strong>
+        <small>${escapeHtml(normalizeCategory(pickedItem.category))} · ${itemModalMode === 'edit' ? `${escapeHtml(pickedItem.stock)} in stock now` : `${escapeHtml(pickedItem.stock)} in stock`}</small>`;
+    }
+
+    function renderDropdown() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
+      const matches = inventoryItems.filter(i => String(i.name).toLowerCase().includes(q)).slice(0, 40);
+      if (!matches.length) {
+        dropdown.innerHTML = '<div class="search-dropdown-item"><span>No matching items</span></div>';
+      } else {
+        dropdown.innerHTML = matches.map(i => {
+          const stock = Number(i.quantity) || 0;
+          return `<div class="search-dropdown-item${stock <= 0 ? ' sc-disabled' : ''}" data-id="${escapeHtml(i.id)}"${stock <= 0 ? ' aria-disabled="true"' : ''}>
+            <span>${escapeHtml(i.name)}</span>
+            <span class="sc-item-meta"><span class="cat-badge ${categoryClass(i.category)}">${escapeHtml(normalizeCategory(i.category))}</span>${stock <= 0 ? 'Out of stock' : escapeHtml(stock) + ' in stock'}</span>
+          </div>`;
+        }).join('');
+      }
+      dropdown.classList.add('open');
+    }
+
+    searchInput.addEventListener('input', renderDropdown);
+    searchInput.addEventListener('focus', renderDropdown);
+    dropdown.addEventListener('click', (e) => {
+      const el = e.target.closest('.search-dropdown-item[data-id]');
+      if (!el || el.classList.contains('sc-disabled')) return;
+      const item = inventoryItems.find(i => String(i.id) === el.dataset.id);
+      if (!item) return;
+      const stock = Number(item.quantity) || 0;
+      pickedItem = { id: String(item.id), name: item.name, category: item.category, stock };
+      maxQty = stock;
+      $('sc-price').value = item.price ? item.price : '';
+      $('sc-qty').max = stock;
+      searchInput.value = '';
+      dropdown.classList.remove('open');
+      renderPicked();
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrapper')) dropdown.classList.remove('open'); });
+
+    async function openItemModal(mode, entry) {
+      if (!selectedStaff()) return;
+      itemModalMode = mode;
+      editingEntry = entry || null;
+      pickedItem = null;
+      $('sc-item-error').textContent = '';
+      $('sc-item-modal-title').textContent = mode === 'add' ? `Add item — ${selectedStaff().name}` : 'Edit entry';
+      $('sc-pick-group').style.display = mode === 'add' ? '' : 'none';
+      searchInput.value = '';
+      dropdown.classList.remove('open');
+      $('sc-qty').value = mode === 'edit' ? entry.quantity : 1;
+      $('sc-price').value = mode === 'edit' ? entry.unit_price : '';
+      $('sc-date').value = mode === 'edit' ? String(entry.taken_on).slice(0, 10) : karachiToday();
+      $('sc-note').value = mode === 'edit' ? (entry.note || '') : '';
+      renderPicked();
+      itemModal.classList.add('open');
+      setBusy(true);
+      try {
+        inventoryItems = await fetchInventory();   // fresh stock every time the form opens
+        if (mode === 'edit') {
+          const inv = inventoryItems.find(i => String(i.id) === String(entry.item_id));
+          const stockNow = inv ? Number(inv.quantity) || 0 : 0;
+          // The entry's own quantity is already out of stock, so it can be re-claimed
+          maxQty = stockNow + (Number(entry.quantity) || 0);
+          pickedItem = { id: String(entry.item_id), name: entry.item_name, category: inv ? inv.category : '', stock: stockNow };
+          $('sc-qty').max = maxQty;
+          renderPicked();
+        } else {
+          maxQty = null;
+          searchInput.focus();
+        }
+      } catch (err) {
+        $('sc-item-error').textContent = 'Could not load inventory: ' + err.message;
+      } finally {
+        setBusy(false);
+      }
+    }
+    function closeItemModal() { itemModal.classList.remove('open'); dropdown.classList.remove('open'); }
+
+    $('sc-add-item').addEventListener('click', () => { if (!scBusy) openItemModal('add'); });
+    $('sc-item-close').addEventListener('click', closeItemModal);
+    $('sc-item-cancel').addEventListener('click', closeItemModal);
+    itemModal.addEventListener('click', (e) => { if (e.target === itemModal) closeItemModal(); });
+
+    $('sc-item-save').addEventListener('click', async () => {
+      if (scBusy) return;
+      const err = $('sc-item-error');
+      err.textContent = '';
+      if (itemModalMode === 'add' && !pickedItem) { err.textContent = 'Choose an item'; return; }
+      const qty = Number($('sc-qty').value);
+      if (!Number.isInteger(qty) || qty < 1) { err.textContent = 'Quantity must be a whole number, 1 or more'; return; }
+      if (maxQty !== null && qty > maxQty) { err.textContent = `Only ${maxQty} available`; return; }
+      const priceRaw = $('sc-price').value;
+      const price = Math.round(Number(priceRaw) * 100) / 100;
+      if (priceRaw === '' || !(price > 0)) { err.textContent = 'Enter a unit price greater than 0'; return; }
+      const date = $('sc-date').value;
+      if (!date) { err.textContent = 'Choose a date'; return; }
+      const note = $('sc-note').value.trim();
+      await runBusy(async () => {
+        try {
+          if (itemModalMode === 'add') {
+            await rpc('add_staff_credit', {
+              p_staff_id: selectedStaff().id, p_item_id: pickedItem.id, p_qty: qty,
+              p_unit_price: price, p_taken_on: date, p_note: note,
+            });
+          } else {
+            await rpc('edit_staff_credit', {
+              p_id: editingEntry.id, p_qty: qty, p_unit_price: price, p_taken_on: date, p_note: note,
+            });
+          }
+          closeItemModal();
+          showToast(itemModalMode === 'add' ? 'Item added' : 'Entry updated', 'success');
+          await loadEntries();
+        } catch (e) {
+          err.textContent = e.message;   // RPC messages (e.g. "Only 3 in stock") shown as-is
+        }
+      });
+    });
+
+    // ── Init ──────────────────────────────────────────────────────
+    async function initStaffCredit() {
+      if (currentRole !== 'admin') {
+        location.replace('hub.html');
+        return;
+      }
+      try {
+        staffList = await fetchStaffList();
+      } catch (err) {
+        showToast('Failed to load staff: ' + err.message, 'error');
+      }
+      renderStaffPills();
+      renderPanel();
+    }
+
+    wireAuthGate();
+    initAuthGate(initStaffCredit);
+  </script>
+</body>
+</html>
