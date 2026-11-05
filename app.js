@@ -289,6 +289,7 @@ async function initAuthGate(onReady) {
   if (header) header.style.display = '';
   if (authView) authView.style.display = 'none';
   if (pageContent) pageContent.style.display = '';
+  scrollActiveNavIntoView();
 
   onReady();
 }
@@ -624,4 +625,13 @@ function setActiveNav(page) {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.page === page);
   });
+  scrollActiveNavIntoView();
+}
+
+// On narrow screens the nav scrolls sideways: keep the current page's link visible
+function scrollActiveNavIntoView() {
+  const nav = document.querySelector('.main-nav');
+  const active = document.querySelector('.nav-link.active');
+  if (!nav || !active || !active.offsetWidth) return;
+  nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
 }

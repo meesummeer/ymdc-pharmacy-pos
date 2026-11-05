@@ -95,14 +95,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  flex-shrink: 0;
+  padding-right: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .brand-logo {
@@ -113,7 +115,7 @@ body {
   flex-shrink: 0;
 }
 
-.brand-text { min-width: 0; }
+.brand-text { flex-shrink: 0; }
 
 .brand h1 {
   font-size: 16px;
@@ -136,14 +138,21 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .main-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.main-nav::-webkit-scrollbar { display: none; }
 
 .nav-link {
   color: rgba(255, 255, 255, 0.9);
@@ -171,6 +180,7 @@ body {
 .user-area {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 10px;
   padding-left: 16px;
   border-left: 1px solid rgba(255, 255, 255, 0.15);
@@ -190,7 +200,8 @@ body {
   font-weight: 500;
   color: var(--gold);
   text-decoration: none;
-  padding: 5px 10px;
+  padding: 5px 14px;
+  border: 1px solid rgba(201, 168, 76, 0.55);
   border-radius: 20px;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -1644,12 +1655,26 @@ button.stock-num {
   .expense-form { grid-template-columns: 1fr; }
 }
 
+/* Header tiers: the full nav (8 links) needs room, so the store name and email only show on wide screens */
+.brand h1, .user-email { display: none; }
+@media (min-width: 1500px) {
+  .header-inner { max-width: 1400px; }
+  .brand h1 { display: block; }
+  .user-email { display: block; }
+}
+@media (max-width: 1000px) {
+  .nav-link { padding: 6px 11px; font-size: 13px; }
+  .brand { padding-right: 14px; }
+  .header-inner { gap: 14px; }
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .header-inner { padding: 0 12px; }
-  .brand h1 { font-size: 13px; max-width: 160px; }
+  .brand { padding-right: 10px; }
   .main-nav { gap: 2px; }
   .nav-link { padding: 6px 10px; font-size: 12px; }
+  .logout-link { padding: 4px 10px; }
   .main-content { padding: 20px 12px 32px; }
   .card { padding: 18px; }
   .invoice-card-header { grid-template-columns: 1fr; }
@@ -1925,6 +1950,9 @@ button.stock-num {
 .sc-item-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .sc-modal-error { color: var(--error); font-size: 13px; margin-top: 8px; min-height: 0; }
 
+/* Hub: six finance cards sit as 3 + 3 */
+.card-grid.fin-grid { grid-template-columns: repeat(3, 1fr); }
+
 /* Hub: To Collect card (amber) */
 .stat-card.stat-card-amber { background: #FFFBEB; border-color: #FDE68A; }
 .stat-card.stat-card-amber::before { background: linear-gradient(90deg, #F59E0B, #B45309); }
@@ -1932,4 +1960,5 @@ button.stock-num {
 
 @media (max-width: 768px) {
   .sc-summary { grid-template-columns: 1fr; }
+  .card-grid.fin-grid { grid-template-columns: repeat(2, 1fr); }
 }
